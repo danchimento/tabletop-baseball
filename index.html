@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Dice Baseball</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Scoreboard -->
+    <div id="scoreboard">
+      <span id="score-display">Score: 0</span>
+      <span id="outs-display">Outs: <span class="out-dots"></span></span>
+      <span id="inning-display">Top 1st</span>
+    </div>
+
+    <!-- Diamond -->
+    <div id="diamond">
+      <svg viewBox="0 0 120 120" width="120" height="120">
+        <polygon points="60,10 110,60 60,110 10,60" fill="none" stroke="#8B6914" stroke-width="2"/>
+        <line x1="60" y1="110" x2="60" y2="10" stroke="#8B6914" stroke-width="0.5" stroke-dasharray="4"/>
+        <line x1="10" y1="60" x2="110" y2="60" stroke="#8B6914" stroke-width="0.5" stroke-dasharray="4"/>
+        <!-- Home -->
+        <rect x="55" y="102" width="10" height="10" fill="#fff" stroke="#333" stroke-width="1" transform="rotate(45,60,107)"/>
+        <!-- 1st base -->
+        <circle id="base-1" cx="110" cy="60" r="8" fill="#2a2a2a" stroke="#8B6914" stroke-width="2"/>
+        <!-- 2nd base -->
+        <circle id="base-2" cx="60" cy="10" r="8" fill="#2a2a2a" stroke="#8B6914" stroke-width="2"/>
+        <!-- 3rd base -->
+        <circle id="base-3" cx="10" cy="60" r="8" fill="#2a2a2a" stroke="#8B6914" stroke-width="2"/>
+      </svg>
+    </div>
+
+    <!-- Count -->
+    <div id="count">
+      <div class="count-row">
+        <span class="count-label">B</span>
+        <span id="balls-dots" class="count-dots"></span>
+      </div>
+      <div class="count-row">
+        <span class="count-label">S</span>
+        <span id="strikes-dots" class="count-dots"></span>
+      </div>
+    </div>
+
+    <!-- Batter Info -->
+    <div id="batter-info">
+      <span id="batter-name">Speedy</span>
+      <span id="batter-profile">(Contact) — 3D6</span>
+    </div>
+
+    <!-- Pitch Result -->
+    <div id="pitch-result" class="hidden">
+      <div id="result-text"></div>
+    </div>
+
+    <!-- Dice Area -->
+    <div id="dice-area" class="hidden">
+      <div class="dice-row">
+        <span class="dice-label">Batter:</span>
+        <span id="batter-dice" class="dice-group"></span>
+        <span id="batter-total" class="dice-total"></span>
+      </div>
+      <div class="dice-row">
+        <span class="dice-label">Pitcher:</span>
+        <span id="pitcher-dice" class="dice-group"></span>
+        <span id="pitcher-total" class="dice-total"></span>
+      </div>
+    </div>
+
+    <!-- Contact Area -->
+    <div id="contact-area" class="hidden">
+      <div class="dice-row">
+        <span class="dice-label">Power:</span>
+        <span id="power-dice" class="dice-group"></span>
+        <span id="power-total" class="dice-total"></span>
+      </div>
+      <div id="contact-result"></div>
+    </div>
+
+    <!-- Card Hand -->
+    <div id="card-hand" class="hidden">
+      <div id="card-hand-label">Choose a card for this at-bat:</div>
+      <div id="cards-container"></div>
+    </div>
+
+    <!-- Pitcher Card Reveal -->
+    <div id="pitcher-card-display" class="hidden">
+      <span class="pitcher-card-label">Pitcher plays:</span>
+      <span id="pitcher-card-name"></span>
+    </div>
+
+    <!-- Action Button -->
+    <div id="action-area">
+      <button id="action-btn" disabled>Loading...</button>
+    </div>
+
+    <!-- Game Log -->
+    <div id="game-log">
+      <div id="log-entries"></div>
+    </div>
+
+    <!-- Inning Summary (overlay) -->
+    <div id="inning-summary" class="hidden">
+      <div id="summary-content">
+        <h2>Inning Over</h2>
+        <div id="final-score"></div>
+        <div id="summary-log"></div>
+        <button id="replay-btn">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js" defer></script>
+</body>
+</html>
