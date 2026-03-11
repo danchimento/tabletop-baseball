@@ -3,55 +3,52 @@
 // ============================================================
 
 const BATTERS = [
-  { name: 'Speedy',  profile: 'Contact', baseDice: 3, powerDice: 2, totalBonus: 0 },
-  { name: 'Steady',  profile: 'Average', baseDice: 2, powerDice: 2, totalBonus: 0 },
-  { name: 'Slugger', profile: 'Star',    baseDice: 4, powerDice: 3, totalBonus: 0 },
-  { name: 'Crusher', profile: 'Power',   baseDice: 2, powerDice: 4, totalBonus: 2 },
-  { name: 'Rookie',  profile: 'Weak',    baseDice: 2, powerDice: 2, totalBonus: 0 },
+  { name: 'Speedy',  profile: 'Contact', baseDice: 3, powerDice: 2 },
+  { name: 'Steady',  profile: 'Average', baseDice: 2, powerDice: 2 },
+  { name: 'Slugger', profile: 'Star',    baseDice: 4, powerDice: 3 },
+  { name: 'Crusher', profile: 'Power',   baseDice: 2, powerDice: 4 },
+  { name: 'Rookie',  profile: 'Weak',    baseDice: 2, powerDice: 2 },
 ];
 
 const PITCHER_BASE_DICE = 3;
 
-const CARD_ARCHETYPES = [
+// Passives: pick 1 per at-bat, visible, triggers automatically
+const PASSIVES = [
+  { id: 'two_strike', name: 'Two-Strike Approach', desc: '+1 die at 2 strikes' },
+  { id: 'patient',    name: 'Patient Hitter',      desc: '+1 die at 3 balls' },
+  { id: 'aggressive', name: 'Aggressive',           desc: '+1 die pitch 1, -1 after pitch 3' },
+  { id: 'clutch',     name: 'Clutch',               desc: '+1 die with RISP' },
+];
+
+// Burn cards: hand of 3 per AB, play 0-1 per pitch, consumed on use
+const BURN_CARDS = [
   {
-    type: 'STAT_BOOST',
-    batterName: 'Power Swing',
-    pitcherName: 'Heat',
-    batterDesc: '+1 die to your pool',
-    pitcherDesc: '+1 die to pitcher pool',
-    effect: { extraDice: 1, opponentDiceRemove: 0, totalBonus: 0, floorValue: null, rerollOpponentHighest: false, highRisk: false },
+    id: 'power_swing',
+    name: 'Power Swing',
+    desc: '+1 die, pitcher floors at 3',
+    batterEffect: { extraDice: 1 },
+    penalty: { pitcherFloor: 3 },
   },
   {
-    type: 'STAT_DEBUFF',
-    batterName: 'Crowd the Plate',
-    pitcherName: 'Changeup',
-    batterDesc: '-1 die from pitcher pool',
-    pitcherDesc: '-1 die from batter pool',
-    effect: { extraDice: 0, opponentDiceRemove: 1, totalBonus: 0, floorValue: null, rerollOpponentHighest: false, highRisk: false },
+    id: 'intimidate',
+    name: 'Intimidate',
+    desc: '-1 pitcher die, your cap at 4',
+    batterEffect: { removePitcherDice: 1 },
+    penalty: { batterCap: 4 },
   },
   {
-    type: 'MANIPULATION',
-    batterName: 'Check Swing',
-    pitcherName: 'Quick Pitch',
-    batterDesc: 'Force pitcher to reroll highest die',
-    pitcherDesc: 'Force batter to reroll highest die',
-    effect: { extraDice: 0, opponentDiceRemove: 0, totalBonus: 0, floorValue: null, rerollOpponentHighest: true, highRisk: false },
+    id: 'swing_fences',
+    name: 'Swing for Fences',
+    desc: '+2 all dice, double strikes',
+    batterEffect: { diceBonus: 2 },
+    penalty: { doubleStrikes: true },
   },
   {
-    type: 'HIGH_RISK',
-    batterName: 'Swing for the Fences',
-    pitcherName: 'Gas',
-    batterDesc: '+2 to all dice, but losses count double',
-    pitcherDesc: '+2 to all dice, but losses count double',
-    effect: { extraDice: 0, opponentDiceRemove: 0, totalBonus: 0, floorValue: null, rerollOpponentHighest: false, highRisk: true },
-  },
-  {
-    type: 'DEFENSIVE',
-    batterName: 'Shorten Up',
-    pitcherName: 'Nibble',
-    batterDesc: 'Set your lowest die to 3',
-    pitcherDesc: 'Set your lowest die to 3',
-    effect: { extraDice: 0, opponentDiceRemove: 0, totalBonus: 0, floorValue: 3, rerollOpponentHighest: false, highRisk: false },
+    id: 'shorten_up',
+    name: 'Shorten Up',
+    desc: 'Floor lowest at 3, -1 power roll',
+    batterEffect: { floorValue: 3 },
+    penalty: { powerPenalty: 1 },
   },
 ];
 
@@ -63,7 +60,6 @@ const CONTACT_THRESHOLDS = [
 ];
 
 // Pair thresholds: how many pairs batter must win for ball/contact
-// Based on number of active pairs (min of batter dice, pitcher dice)
 const PAIR_THRESHOLDS = {
   2: { ball: 1, contact: 2 },
   3: { ball: 1, contact: 2 },
@@ -90,12 +86,14 @@ function freshState() {
     runners: [false, false, false], // [1st, 2nd, 3rd]
     currentBatterIndex: 0,
     count: { balls: 0, strikes: 0 },
-    phase: 'SELECT_CARD', // SELECT_CARD | ROLLING | REVEALING | CONTACT | AT_BAT_RESULT | INNING_OVER
-    batterCard: null,
-    pitcherCard: null,
-    hand: [],
+    phase: 'SELECT_PASSIVE', // SELECT_PASSIVE | ROLLING | REVEALING | CONTACT | AT_BAT_RESULT | INNING_OVER
+    passive: null,
+    burnHand: [],
+    selectedBurn: null,   // highlighted burn card (not yet consumed)
+    lastBurnUsed: null,   // burn used on the last pitch (for penalty tracking)
+    pitchCount: 0,
     lastRoll: null,
-    pairData: null,   // { pairs, revealedCount, wins, losses, ties, result, thresholds, numPairs }
+    pairData: null,
     contactResult: null,
     atBatResult: null,
     gameLog: [],
@@ -118,45 +116,77 @@ function sumDice(dice) {
   return dice.reduce((a, b) => a + b, 0);
 }
 
-function applyCardEffects(dice, card, isOwner) {
-  let modified = [...dice];
+function getPassiveDiceMod() {
+  if (!state.passive) return 0;
+  switch (state.passive.id) {
+    case 'two_strike': return state.count.strikes >= 2 ? 1 : 0;
+    case 'patient':    return state.count.balls >= 3 ? 1 : 0;
+    case 'aggressive':
+      // pitchCount is already incremented when this runs inside rollPitch
+      if (state.pitchCount <= 1) return 1;
+      if (state.pitchCount > 3) return -1;
+      return 0;
+    case 'clutch': return (state.runners[1] || state.runners[2]) ? 1 : 0;
+    default: return 0;
+  }
+}
 
-  if (!card) return modified;
-
-  const eff = card.effect;
-
-  if (isOwner) {
-    // Add extra dice
-    for (let i = 0; i < eff.extraDice; i++) {
+function applyPassive(batterDice) {
+  const mod = getPassiveDiceMod();
+  let modified = [...batterDice];
+  if (mod > 0) {
+    for (let i = 0; i < mod; i++) {
       modified.push(Math.floor(Math.random() * 6) + 1);
     }
-    // Floor value: set lowest die to at least floorValue
-    if (eff.floorValue !== null) {
-      const minIdx = modified.indexOf(Math.min(...modified));
-      if (modified[minIdx] < eff.floorValue) {
-        modified[minIdx] = eff.floorValue;
-      }
-    }
-    // High risk: +2 to all dice
-    if (eff.highRisk) {
-      modified = modified.map(d => d + 2);
-    }
-  } else {
-    // Opponent removes dice from your pool
-    for (let i = 0; i < eff.opponentDiceRemove && modified.length > 1; i++) {
+  } else if (mod < 0) {
+    for (let i = 0; i < Math.abs(mod) && modified.length > 1; i++) {
       modified.splice(modified.indexOf(Math.min(...modified)), 1);
     }
   }
-
   return modified;
 }
 
-function applyManipulation(dice, opponentCard) {
-  if (!opponentCard || !opponentCard.effect.rerollOpponentHighest) return dice;
-  const modified = [...dice];
-  const maxIdx = modified.indexOf(Math.max(...modified));
-  modified[maxIdx] = Math.floor(Math.random() * 6) + 1;
-  return modified;
+function applyBurnEffects(batterDice, pitcherDice, burn) {
+  if (!burn) return { batterDice: [...batterDice], pitcherDice: [...pitcherDice] };
+
+  let bMod = [...batterDice];
+  let pMod = [...pitcherDice];
+  const be = burn.batterEffect;
+  const pen = burn.penalty;
+
+  // Batter benefits
+  if (be.extraDice) {
+    for (let i = 0; i < be.extraDice; i++) {
+      bMod.push(Math.floor(Math.random() * 6) + 1);
+    }
+  }
+  if (be.removePitcherDice) {
+    for (let i = 0; i < be.removePitcherDice && pMod.length > 1; i++) {
+      pMod.splice(pMod.indexOf(Math.min(...pMod)), 1);
+    }
+  }
+  if (be.diceBonus) {
+    bMod = bMod.map(d => d + be.diceBonus);
+  }
+  if (be.floorValue) {
+    const minIdx = bMod.indexOf(Math.min(...bMod));
+    if (bMod[minIdx] < be.floorValue) {
+      bMod[minIdx] = be.floorValue;
+    }
+  }
+
+  // Penalties
+  if (pen.pitcherFloor) {
+    const minIdx = pMod.indexOf(Math.min(...pMod));
+    if (pMod[minIdx] < pen.pitcherFloor) {
+      pMod[minIdx] = pen.pitcherFloor;
+    }
+  }
+  if (pen.batterCap) {
+    bMod = bMod.map(d => Math.min(d, pen.batterCap));
+  }
+
+  return { batterDice: bMod, pitcherDice: pMod };
 }
 
 function comparePairs(batterDice, pitcherDice) {
@@ -199,17 +229,9 @@ function resolveContactOutcome(powerDiceTotal) {
 // SECTION D: Card System
 // ============================================================
 
-function generateHand() {
-  // For MVP: shuffle all 5 archetypes and deal them all
-  const shuffled = [...CARD_ARCHETYPES].sort(() => Math.random() - 0.5);
-  return shuffled;
-}
-
-function aiSelectCard() {
-  // Draw 3 at random, pick 1
-  const shuffled = [...CARD_ARCHETYPES].sort(() => Math.random() - 0.5);
-  const drawn = shuffled.slice(0, 3);
-  return drawn[Math.floor(Math.random() * drawn.length)];
+function generateBurnHand() {
+  const shuffled = [...BURN_CARDS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3);
 }
 
 // ============================================================
@@ -224,47 +246,72 @@ function startInning() {
 
 function startAtBat() {
   state.count = { balls: 0, strikes: 0 };
-  state.batterCard = null;
-  state.pitcherCard = aiSelectCard();
-  state.hand = generateHand();
+  state.passive = null;
+  state.burnHand = generateBurnHand();
+  state.selectedBurn = null;
+  state.lastBurnUsed = null;
+  state.pitchCount = 0;
   state.lastRoll = null;
   state.pairData = null;
   state.contactResult = null;
   state.atBatResult = null;
-  state.phase = 'SELECT_CARD';
+  state.phase = 'SELECT_PASSIVE';
   const batter = BATTERS[state.currentBatterIndex];
   addLog(`${batter.name} steps up to bat.`);
   render();
 }
 
-function selectCard(index) {
-  if (state.phase !== 'SELECT_CARD') return;
-  state.batterCard = state.hand[index];
+function selectPassive(index) {
+  if (state.phase !== 'SELECT_PASSIVE') return;
+  state.passive = PASSIVES[index];
   state.phase = 'ROLLING';
-  addLog(`${currentBatter().name} plays ${state.batterCard.batterName}. Pitcher plays ${state.pitcherCard.pitcherName}.`);
+  addLog(`${currentBatter().name} takes a ${state.passive.name} approach.`);
+  render();
+}
+
+function toggleBurn(index) {
+  if (state.phase !== 'ROLLING') return;
+  const card = state.burnHand[index];
+  if (state.selectedBurn && state.selectedBurn.id === card.id) {
+    state.selectedBurn = null;
+  } else {
+    state.selectedBurn = card;
+  }
   render();
 }
 
 function rollPitch() {
   if (state.phase !== 'ROLLING') return;
 
+  state.pitchCount++;
   const batter = currentBatter();
+  const burn = state.selectedBurn;
+  state.lastBurnUsed = burn;
+
+  // Consume burn card from hand
+  if (burn) {
+    state.burnHand = state.burnHand.filter(c => c.id !== burn.id);
+    state.selectedBurn = null;
+  }
 
   // Roll base dice
   let batterDice = rollDice(batter.baseDice);
   let pitcherDice = rollDice(PITCHER_BASE_DICE);
 
-  // Apply own card effects
-  batterDice = applyCardEffects(batterDice, state.batterCard, true);
-  pitcherDice = applyCardEffects(pitcherDice, state.pitcherCard, true);
+  // Apply passive
+  batterDice = applyPassive(batterDice);
 
-  // Apply opponent's card effects (debuffs)
-  batterDice = applyCardEffects(batterDice, state.pitcherCard, false);
-  pitcherDice = applyCardEffects(pitcherDice, state.batterCard, false);
+  // Apply burn effects + penalties
+  const burnResult = applyBurnEffects(batterDice, pitcherDice, burn);
+  batterDice = burnResult.batterDice;
+  pitcherDice = burnResult.pitcherDice;
 
-  // Apply manipulation (reroll opponent's highest)
-  batterDice = applyManipulation(batterDice, state.pitcherCard);
-  pitcherDice = applyManipulation(pitcherDice, state.batterCard);
+  // Log what was used
+  const passiveMod = getPassiveDiceMod();
+  let usedParts = [];
+  if (burn) usedParts.push(burn.name);
+  if (passiveMod !== 0) usedParts.push(`${state.passive.name} ${passiveMod > 0 ? '+1' : '-1'}`);
+  if (usedParts.length) addLog(`Pitch ${state.pitchCount}: ${usedParts.join(', ')}`);
 
   // Compare using paired dice
   const comparison = comparePairs(batterDice, pitcherDice);
@@ -280,7 +327,6 @@ function rollPitch() {
   state.phase = 'REVEALING';
   render();
 
-  // Start the pair-by-pair reveal
   setTimeout(revealNextPair, 400);
 }
 
@@ -302,26 +348,24 @@ function finishReveal() {
 
   const pd = state.pairData;
   const result = pd.result;
-
-  const multiplier_batter = (state.pitcherCard && state.pitcherCard.effect.highRisk && result === 'ball') ? 2 : 1;
-  const multiplier_pitcher = (state.batterCard && state.batterCard.effect.highRisk && (result === 'strike' || result === 'foul')) ? 2 : 1;
+  const burn = state.lastBurnUsed;
+  const doubleStrikes = burn && burn.penalty && burn.penalty.doubleStrikes;
 
   if (result === 'strike') {
-    state.count.strikes += multiplier_pitcher;
-    addLog(`${pd.wins}/${pd.numPairs} pairs won — Strike!${multiplier_pitcher > 1 ? ' (Double!)' : ''}`);
+    const mult = doubleStrikes ? 2 : 1;
+    state.count.strikes += mult;
+    addLog(`${pd.wins}/${pd.numPairs} pairs won — Strike!${mult > 1 ? ' (Double!)' : ''}`);
   } else if (result === 'foul') {
-    // Foul = strike, but can't strike out on a foul (cap at 2)
-    const newStrikes = Math.min(state.count.strikes + multiplier_pitcher, 2);
-    state.count.strikes = newStrikes;
+    const mult = doubleStrikes ? 2 : 1;
+    state.count.strikes = Math.min(state.count.strikes + mult, 2);
     addLog(`${pd.wins}/${pd.numPairs} pairs won (tied ${pd.wins}-${pd.losses}) — Foul Ball`);
   } else if (result === 'ball') {
-    state.count.balls += multiplier_batter;
-    addLog(`${pd.wins}/${pd.numPairs} pairs won — Ball${multiplier_batter > 1 ? ' (Double!)' : ''}`);
+    state.count.balls++;
+    addLog(`${pd.wins}/${pd.numPairs} pairs won — Ball`);
   } else {
     addLog(`${pd.wins}/${pd.numPairs} pairs won — Contact!`);
   }
 
-  // Check terminal states
   if (result === 'contact') {
     state.phase = 'CONTACT';
     render();
@@ -347,11 +391,18 @@ function resolveContact() {
 
   const batter = currentBatter();
   const powerDice = rollDice(batter.powerDice);
-  const powerTotal = sumDice(powerDice);
+  let powerTotal = sumDice(powerDice);
+
+  // Apply Shorten Up penalty if used on the contact pitch
+  const burn = state.lastBurnUsed;
+  if (burn && burn.penalty && burn.penalty.powerPenalty) {
+    powerTotal = Math.max(0, powerTotal - burn.penalty.powerPenalty);
+  }
+
   const outcome = resolveContactOutcome(powerTotal);
 
   state.contactResult = { powerDice, powerTotal, outcome };
-  addLog(`Power roll: ${powerTotal} — ${outcome.label}`);
+  addLog(`Power roll: ${powerTotal}${burn && burn.penalty.powerPenalty ? ` (-${burn.penalty.powerPenalty} ${burn.name})` : ''} — ${outcome.label}`);
 
   if (outcome.outcome === 'ground_out') {
     resolveAtBatEnd('ground_out');
@@ -395,7 +446,7 @@ function resolveAtBatEnd(outcome) {
       break;
 
     case 'home_run': {
-      let runs = 1; // batter scores
+      let runs = 1;
       for (let i = 0; i < 3; i++) {
         if (state.runners[i]) runs++;
       }
@@ -406,7 +457,6 @@ function resolveAtBatEnd(outcome) {
     }
   }
 
-  // Check if inning is over
   if (state.outs >= OUTS_PER_INNING) {
     state.phase = 'INNING_OVER';
     addLog(`--- Inning over. Final score: ${state.score} ---`, true);
@@ -419,8 +469,6 @@ function resolveAtBatEnd(outcome) {
 }
 
 function advanceRunners(bases, batterOnBase) {
-  // Move runners forward by 'bases' positions
-  // Runners that go past 3rd score
   const newRunners = [false, false, false];
 
   for (let i = 2; i >= 0; i--) {
@@ -434,13 +482,9 @@ function advanceRunners(bases, batterOnBase) {
     }
   }
 
-  // For walks: only force runners (push occupied bases forward)
   if (!batterOnBase) {
-    // Walk logic: only force runners when base is occupied
-    // Reset and re-do with forced advancement
     const occupied = [state.runners[0], state.runners[1], state.runners[2]];
     const result = [false, false, false];
-    // Batter goes to 1st, force chain
     let pushing = true;
     for (let i = 0; i < 3; i++) {
       if (pushing && occupied[i]) {
@@ -463,11 +507,6 @@ function advanceRunners(bases, batterOnBase) {
 function nextBatter() {
   state.currentBatterIndex = (state.currentBatterIndex + 1) % BATTERS.length;
   startAtBat();
-}
-
-function endInning() {
-  state.phase = 'INNING_OVER';
-  render();
 }
 
 function currentBatter() {
@@ -496,8 +535,9 @@ function render() {
   renderDiceArea();
   renderContactArea();
   renderPitchResult();
-  renderCardHand();
-  renderPitcherCard();
+  renderPassiveSelection();
+  renderPassiveDisplay();
+  renderBurnHand();
   renderActionButton();
   renderLog();
   renderSummary();
@@ -535,12 +575,12 @@ function renderCount() {
 function renderBatterInfo() {
   const b = currentBatter();
   $('batter-name').textContent = b.name;
-  $('batter-profile').textContent = `(${b.profile}) — ${b.baseDice}D6${b.totalBonus ? ' +' + b.totalBonus : ''}`;
+  $('batter-profile').textContent = `(${b.profile}) — ${b.baseDice}D6`;
 }
 
 function renderDiceArea() {
   const area = $('dice-area');
-  if (!state.pairData || state.phase === 'SELECT_CARD') {
+  if (!state.pairData || state.phase === 'SELECT_PASSIVE') {
     area.classList.add('hidden');
     return;
   }
@@ -549,7 +589,6 @@ function renderDiceArea() {
   const pd = state.pairData;
   const revealed = pd.revealedCount;
 
-  // Build pair rows
   let pairsHtml = '';
   for (let i = 0; i < pd.pairs.length; i++) {
     const pair = pd.pairs[i];
@@ -568,7 +607,6 @@ function renderDiceArea() {
 
   $('pairs-container').innerHTML = pairsHtml;
 
-  // Build threshold display
   const thDisplay = $('threshold-display');
   if (revealed > 0) {
     thDisplay.classList.remove('hidden');
@@ -620,7 +658,7 @@ function renderContactArea() {
 
 function renderPitchResult() {
   const el = $('pitch-result');
-  if (!state.lastRoll || state.phase === 'SELECT_CARD' || state.phase === 'REVEALING') {
+  if (!state.lastRoll || state.phase === 'SELECT_PASSIVE' || state.phase === 'REVEALING') {
     el.classList.add('hidden');
     return;
   }
@@ -656,52 +694,99 @@ function renderPitchResult() {
   }
 }
 
-function renderCardHand() {
-  const hand = $('card-hand');
-  if (state.phase !== 'SELECT_CARD') {
-    hand.classList.add('hidden');
+function renderPassiveSelection() {
+  const el = $('card-hand');
+  if (state.phase !== 'SELECT_PASSIVE') {
+    el.classList.add('hidden');
     return;
   }
-  hand.classList.remove('hidden');
+  el.classList.remove('hidden');
 
+  $('card-hand-label').textContent = 'Choose your approach:';
   const container = $('cards-container');
-  container.innerHTML = state.hand.map((card, i) => `
-    <div class="card" data-card-index="${i}">
-      <div class="card-name">${card.batterName}</div>
-      <div class="card-type">${card.type.replace('_', ' ')}</div>
-      <div class="card-desc">${card.batterDesc}</div>
+  container.innerHTML = PASSIVES.map((p, i) => `
+    <div class="card" data-passive-index="${i}">
+      <div class="card-name">${p.name}</div>
+      <div class="card-desc">${p.desc}</div>
     </div>
   `).join('');
 
   container.onclick = (e) => {
     const cardEl = e.target.closest('.card');
-    if (cardEl) {
-      selectCard(parseInt(cardEl.dataset.cardIndex));
+    if (cardEl && cardEl.dataset.passiveIndex !== undefined) {
+      selectPassive(parseInt(cardEl.dataset.passiveIndex));
     }
   };
 }
 
-function renderPitcherCard() {
-  const el = $('pitcher-card-display');
-  if (state.phase === 'SELECT_CARD' || !state.pitcherCard) {
+function renderPassiveDisplay() {
+  const el = $('passive-display');
+  if (!state.passive || state.phase === 'SELECT_PASSIVE') {
     el.classList.add('hidden');
     return;
   }
   el.classList.remove('hidden');
-  $('pitcher-card-name').textContent = `${state.pitcherCard.pitcherName} (${state.pitcherCard.pitcherDesc})`;
+
+  // Preview passive status for next pitch
+  let status = '';
+  if (state.phase === 'ROLLING') {
+    const nextPitch = state.pitchCount + 1;
+    let active = false;
+    switch (state.passive.id) {
+      case 'two_strike': active = state.count.strikes >= 2; break;
+      case 'patient':    active = state.count.balls >= 3; break;
+      case 'aggressive': active = nextPitch <= 1 ? true : nextPitch > 3 ? 'penalty' : false; break;
+      case 'clutch':     active = state.runners[1] || state.runners[2]; break;
+    }
+    if (active === 'penalty') status = ' (active: -1 die)';
+    else if (active) status = ' (active: +1 die)';
+  }
+
+  $('passive-name').textContent = `${state.passive.name}${status}`;
+}
+
+function renderBurnHand() {
+  const el = $('burn-hand');
+  if (state.phase !== 'ROLLING' || state.burnHand.length === 0) {
+    el.classList.add('hidden');
+    return;
+  }
+  el.classList.remove('hidden');
+
+  const container = $('burn-cards-container');
+  container.innerHTML = state.burnHand.map((card, i) => {
+    const selected = state.selectedBurn && state.selectedBurn.id === card.id;
+    return `
+      <div class="card burn-card ${selected ? 'card-selected' : ''}" data-burn-index="${i}">
+        <div class="card-name">${card.name}</div>
+        <div class="card-desc">${card.desc}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.onclick = (e) => {
+    const cardEl = e.target.closest('.burn-card');
+    if (cardEl && cardEl.dataset.burnIndex !== undefined) {
+      toggleBurn(parseInt(cardEl.dataset.burnIndex));
+    }
+  };
 }
 
 function renderActionButton() {
   const btn = $('action-btn');
 
   switch (state.phase) {
-    case 'SELECT_CARD':
-      btn.textContent = 'Select a Card';
+    case 'SELECT_PASSIVE':
+      btn.textContent = 'Choose an Approach';
       btn.disabled = true;
       btn.onclick = null;
       break;
     case 'ROLLING':
-      btn.textContent = 'Roll Dice';
+      if (state.selectedBurn) {
+        btn.textContent = `Roll Dice (${state.selectedBurn.name})`;
+      } else {
+        btn.textContent = 'Roll Dice';
+      }
       btn.disabled = false;
       btn.onclick = rollPitch;
       break;
