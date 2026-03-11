@@ -9,92 +9,60 @@
 </head>
 <body>
   <div id="app">
-    <!-- Scoreboard -->
-    <div id="scoreboard">
-      <span id="score-display">Score: 0</span>
-      <span id="outs-display">Outs: <span class="out-dots"></span></span>
-      <span id="inning-display">Top 1st</span>
-    </div>
-
-    <!-- Diamond -->
-    <div id="diamond">
-      <svg viewBox="0 0 120 120" width="120" height="120">
-        <polygon points="60,10 110,60 60,110 10,60" fill="none" stroke="#8B6914" stroke-width="2"/>
-        <line x1="60" y1="110" x2="60" y2="10" stroke="#8B6914" stroke-width="0.5" stroke-dasharray="4"/>
-        <line x1="10" y1="60" x2="110" y2="60" stroke="#8B6914" stroke-width="0.5" stroke-dasharray="4"/>
-        <!-- Home -->
-        <rect x="55" y="102" width="10" height="10" fill="#fff" stroke="#333" stroke-width="1" transform="rotate(45,60,107)"/>
-        <!-- 1st base -->
-        <circle id="base-1" cx="110" cy="60" r="8" fill="#2a2a2a" stroke="#8B6914" stroke-width="2"/>
-        <!-- 2nd base -->
-        <circle id="base-2" cx="60" cy="10" r="8" fill="#2a2a2a" stroke="#8B6914" stroke-width="2"/>
-        <!-- 3rd base -->
-        <circle id="base-3" cx="10" cy="60" r="8" fill="#2a2a2a" stroke="#8B6914" stroke-width="2"/>
-      </svg>
-    </div>
-
-    <!-- Count -->
-    <div id="count">
-      <div class="count-row">
-        <span class="count-label">B</span>
-        <span id="balls-dots" class="count-dots"></span>
+    <!-- Top Bar -->
+    <div id="top-bar">
+      <div id="scoreboard">
+        <span id="score-display">Score: 0</span>
+        <span id="inning-display">Top 1st</span>
+        <span id="outs-display">Outs: <span class="out-dots"></span></span>
       </div>
-      <div class="count-row">
-        <span class="count-label">S</span>
-        <span id="strikes-dots" class="count-dots"></span>
+      <div id="status-row">
+        <svg id="mini-diamond" viewBox="0 0 50 50" width="36" height="36">
+          <polygon points="25,5 45,25 25,45 5,25" fill="none" stroke="#8B6914" stroke-width="1.5"/>
+          <circle id="base-1" cx="45" cy="25" r="4" fill="#2a2a2a" stroke="#8B6914" stroke-width="1.5"/>
+          <circle id="base-2" cx="25" cy="5" r="4" fill="#2a2a2a" stroke="#8B6914" stroke-width="1.5"/>
+          <circle id="base-3" cx="5" cy="25" r="4" fill="#2a2a2a" stroke="#8B6914" stroke-width="1.5"/>
+        </svg>
+        <div id="count">
+          <div class="count-row"><span class="count-label">B</span><span id="balls-dots" class="count-dots"></span></div>
+          <div class="count-row"><span class="count-label">S</span><span id="strikes-dots" class="count-dots"></span></div>
+        </div>
       </div>
     </div>
 
-    <!-- Batter Info -->
-    <div id="batter-info">
-      <span id="batter-name">Speedy</span>
-      <span id="batter-profile">(Contact) — 3D6</span>
-    </div>
-
-    <!-- Pitch Result -->
-    <div id="pitch-result" class="hidden">
-      <div id="result-text"></div>
-    </div>
-
-    <!-- Dice Area (Paired) -->
-    <div id="dice-area" class="hidden">
-      <div id="pairs-header">
-        <span></span>
-        <span class="pairs-side">Batter</span>
-        <span></span>
-        <span class="pairs-side">Pitcher</span>
-        <span></span>
+    <!-- Battlefield -->
+    <div id="battlefield">
+      <div id="pitcher-side">
+        <div class="player-label">Pitcher</div>
+        <div id="pitch-clock">
+          <svg viewBox="0 0 44 44" width="40" height="40">
+            <circle cx="22" cy="22" r="19" fill="none" stroke="#333" stroke-width="2"/>
+            <circle id="clock-ring" cx="22" cy="22" r="19" fill="none" stroke="#e94560" stroke-width="2.5"
+                    stroke-dasharray="119.38" stroke-dashoffset="0"
+                    transform="rotate(-90 22 22)" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div id="pitcher-dice" class="dice-col"></div>
       </div>
-      <div id="pairs-container"></div>
-      <div id="threshold-display" class="hidden"></div>
-    </div>
 
-    <!-- Contact Area -->
-    <div id="contact-area" class="hidden">
-      <div class="dice-row">
-        <span class="dice-label">Power:</span>
-        <span id="power-dice" class="dice-group"></span>
-        <span id="power-total" class="dice-total"></span>
+      <div id="center-col">
+        <div id="outcome-bar">
+          <div class="ob-seg ob-strike"><span>K</span></div>
+          <div class="ob-seg ob-foul"><span>Foul</span></div>
+          <div class="ob-seg ob-ball"><span>Ball</span></div>
+          <div class="ob-seg ob-contact"><span>Hit!</span></div>
+          <div id="ob-indicator"></div>
+        </div>
+        <div id="battle-zone">
+          <div class="battle-lane" id="lane-0"></div>
+          <div class="battle-lane" id="lane-1"></div>
+        </div>
       </div>
-      <div id="contact-result"></div>
-    </div>
 
-    <!-- Passive Selection (shown at start of AB) -->
-    <div id="card-hand" class="hidden">
-      <div id="card-hand-label">Choose your approach:</div>
-      <div id="cards-container"></div>
-    </div>
-
-    <!-- Active Passive Display -->
-    <div id="passive-display" class="hidden">
-      <span class="passive-label">Approach:</span>
-      <span id="passive-name"></span>
-    </div>
-
-    <!-- Burn Card Hand (shown during ROLLING) -->
-    <div id="burn-hand" class="hidden">
-      <div id="burn-hand-label">Burn a card (optional):</div>
-      <div id="burn-cards-container"></div>
+      <div id="batter-side">
+        <div class="player-label" id="batter-name">Batter</div>
+        <div id="batter-dice" class="dice-col"></div>
+      </div>
     </div>
 
     <!-- Action Button -->
@@ -107,7 +75,58 @@
       <div id="log-entries"></div>
     </div>
 
-    <!-- Inning Summary (overlay) -->
+    <!-- Contact Modal -->
+    <div id="contact-modal" class="hidden">
+      <div id="field-view">
+        <svg id="baseball-field" viewBox="0 0 300 280">
+          <!-- Background -->
+          <rect width="300" height="280" fill="#1a3a1a"/>
+          <!-- Outfield grass -->
+          <path d="M 150 260 L 8.6 118.6 A 200 200 0 0 1 291.4 118.6 Z" fill="#2d5a1e"/>
+          <!-- Infield dirt -->
+          <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="#8B6914" opacity="0.5"/>
+
+          <!-- Zone overlays -->
+          <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="rgba(233,69,96,0.25)"/>
+          <path d="M 107.6 217.6 A 60 60 0 0 1 192.4 217.6 L 217.2 192.8 A 95 95 0 0 0 82.8 192.8 Z" fill="rgba(76,175,80,0.25)"/>
+          <path d="M 82.8 192.8 A 95 95 0 0 1 217.2 192.8 L 245.5 164.5 A 135 135 0 0 0 54.5 164.5 Z" fill="rgba(233,69,96,0.25)"/>
+          <path d="M 54.5 164.5 A 135 135 0 0 1 245.5 164.5 L 266.7 143.3 A 165 165 0 0 0 33.3 143.3 Z" fill="rgba(76,175,80,0.25)"/>
+          <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3 L 284.4 125.6 A 190 190 0 0 0 15.6 125.6 Z" fill="rgba(76,175,80,0.3)"/>
+
+          <!-- Fence -->
+          <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3" fill="none" stroke="#654" stroke-width="3"/>
+          <!-- Foul lines -->
+          <line x1="150" y1="260" x2="8.6" y2="118.6" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <line x1="150" y1="260" x2="291.4" y2="118.6" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <!-- Base diamond -->
+          <polygon points="150,260 180,230 150,200 120,230" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+          <rect x="147" y="257" width="6" height="6" fill="#fff" transform="rotate(45,150,260)"/>
+          <rect x="177" y="227" width="6" height="6" fill="#fff" transform="rotate(45,180,230)"/>
+          <rect x="147" y="197" width="6" height="6" fill="#fff" transform="rotate(45,150,200)"/>
+          <rect x="117" y="227" width="6" height="6" fill="#fff" transform="rotate(45,120,230)"/>
+
+          <!-- Number markers -->
+          <g font-size="11" font-weight="700" text-anchor="middle" fill="#fff">
+            <circle cx="128" cy="232" r="11" fill="rgba(0,0,0,0.5)"/><text x="128" y="236">2</text>
+            <circle cx="153" cy="222" r="11" fill="rgba(0,0,0,0.5)"/><text x="153" y="226">3</text>
+            <circle cx="175" cy="235" r="11" fill="rgba(0,0,0,0.5)"/><text x="175" y="239">4</text>
+            <circle cx="82" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="82" y="176">5</text>
+            <circle cx="150" cy="150" r="11" fill="rgba(0,0,0,0.5)"/><text x="150" y="154">6</text>
+            <circle cx="218" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="218" y="176">7</text>
+            <circle cx="108" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="108" y="202">8</text>
+            <circle cx="192" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="192" y="202">9</text>
+            <circle cx="52" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="52" y="152">10</text>
+            <circle cx="248" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="248" y="152">11</text>
+            <circle cx="150" cy="85" r="13" fill="rgba(240,192,64,0.8)" stroke="#fff" stroke-width="1.5"/><text x="150" y="89" fill="#000">12</text>
+          </g>
+        </svg>
+        <div id="field-overlay"></div>
+        <div id="contact-outcome"></div>
+        <button id="contact-roll-btn" class="hidden">Roll!</button>
+      </div>
+    </div>
+
+    <!-- Inning Summary -->
     <div id="inning-summary" class="hidden">
       <div id="summary-content">
         <h2>Inning Over</h2>

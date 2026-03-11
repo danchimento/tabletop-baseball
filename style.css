@@ -33,368 +33,225 @@ html, body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding: 0 12px 12px;
+  padding: 0 8px 8px;
 }
 
 .hidden { display: none !important; }
 
-/* === Scoreboard === */
+/* === Top Bar === */
+#top-bar {
+  padding: 8px 0;
+  border-bottom: 1px solid #333;
+}
+
 #scoreboard {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  border-bottom: 1px solid #333;
+  margin-bottom: 4px;
 }
 
 #score-display { color: var(--gold); }
 
 .out-dots { letter-spacing: 2px; }
 
-/* === Diamond === */
-#diamond {
+#status-row {
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 8px 0;
+  gap: 16px;
 }
 
-#diamond svg { filter: drop-shadow(0 0 4px rgba(240, 192, 64, 0.3)); }
+#mini-diamond { filter: drop-shadow(0 0 3px rgba(240, 192, 64, 0.3)); }
 
 .runner-on { fill: var(--gold) !important; }
 
 /* === Count === */
 #count {
   display: flex;
-  gap: 16px;
-  justify-content: center;
-  padding: 6px 0;
-  font-size: 16px;
+  gap: 12px;
+  font-size: 14px;
 }
 
 .count-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .count-label {
   font-weight: 700;
-  width: 16px;
+  width: 14px;
 }
 
-.count-dots { letter-spacing: 4px; font-size: 18px; }
+.count-dots { letter-spacing: 3px; font-size: 16px; }
 
 .ball-on { color: var(--green); }
 .strike-on { color: var(--red); }
 
-/* === Batter Info === */
-#batter-info {
-  text-align: center;
-  padding: 8px 0;
-  font-size: 16px;
-}
-
-#batter-name {
-  font-weight: 700;
-  font-size: 20px;
-  margin-right: 6px;
-}
-
-#batter-profile { color: var(--text-dim); }
-
-/* === Pitch Result === */
-#pitch-result {
-  text-align: center;
-  padding: 8px 0;
-  font-size: 22px;
-  font-weight: 700;
-  min-height: 44px;
-}
-
-.result-strike { color: var(--red); }
-.result-foul { color: #c0a040; }
-.result-ball { color: var(--green); }
-.result-contact { color: var(--gold); }
-
-/* === Dice Area (Paired) === */
-#dice-area, #contact-area {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 12px;
-  margin: 6px 0;
-}
-
-#pairs-header {
+/* === Battlefield === */
+#battlefield {
   display: grid;
-  grid-template-columns: 28px 1fr 40px 1fr 28px;
+  grid-template-columns: 90px 1fr 90px;
+  gap: 4px;
+  padding: 8px 0;
+  flex: 1;
+  align-content: start;
+}
+
+/* === Player Sides === */
+#pitcher-side, #batter-side {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-items: center;
-  padding: 0 0 6px;
-  font-size: 12px;
-  color: var(--text-dim);
+}
+
+.player-label {
+  font-size: 14px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-}
-
-/* Batter label lands in col 2, Pitcher in col 4 via natural grid flow */
-
-.pair-row {
-  display: grid;
-  grid-template-columns: 28px 1fr 40px 1fr 28px;
-  align-items: center;
-  justify-items: center;
-  padding: 6px 0;
-  border-radius: 6px;
-  margin: 3px 0;
-  transition: background 0.3s;
-}
-
-.pair-num {
-  font-size: 13px;
   color: var(--text-dim);
-  font-weight: 600;
-}
-
-.pair-vs {
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
-}
-
-.pair-icon {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.pair-win { background: rgba(76, 175, 80, 0.15); }
-.pair-win .pair-icon { color: var(--green); }
-.pair-win .pair-die-batter { box-shadow: 0 0 0 2px var(--green), 0 2px 4px rgba(0,0,0,0.3); }
-
-.pair-loss { background: rgba(233, 69, 96, 0.15); }
-.pair-loss .pair-icon { color: var(--red); }
-.pair-loss .pair-die-pitcher { box-shadow: 0 0 0 2px var(--red), 0 2px 4px rgba(0,0,0,0.3); }
-
-.pair-tie { background: rgba(150, 150, 150, 0.1); }
-.pair-tie .pair-icon { color: var(--text-dim); }
-.pair-tie .die { opacity: 0.6; }
-
-.pair-pending { opacity: 0.3; }
-
-.die {
-  width: 36px;
-  height: 36px;
-  background: #fff;
-  color: #111;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: 700;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-}
-
-.die-hidden {
-  background: #333;
-  color: #555;
-  box-shadow: none;
-}
-
-.die-rerolled {
-  box-shadow: 0 0 0 2px var(--accent);
-}
-
-/* === Threshold Display === */
-#threshold-display {
-  padding: 8px 0 0;
-  text-align: center;
-  border-top: 1px solid #333;
-  margin-top: 8px;
-}
-
-.threshold-wins {
-  font-size: 16px;
-  font-weight: 700;
   margin-bottom: 4px;
 }
 
-.threshold-checks {
+#pitcher-side .player-label { color: var(--red); }
+#batter-side .player-label { color: var(--green); }
+
+/* === Pitch Clock === */
+#pitch-clock {
+  margin: 4px 0 8px;
+}
+
+/* === Dice Columns === */
+.dice-col {
   display: flex;
-  justify-content: center;
-  gap: 20px;
-  font-size: 14px;
-}
-
-.th-check { transition: color 0.3s; }
-.th-met { color: var(--green); font-weight: 600; }
-.th-unmet { color: var(--text-dim); }
-
-.threshold-result {
-  font-size: 22px;
-  font-weight: 700;
-  margin-top: 6px;
-  animation: result-pop 0.4s ease-out;
-}
-
-.threshold-result-contact { color: var(--gold); }
-.threshold-result-ball { color: var(--green); }
-.threshold-result-strike { color: var(--red); }
-.threshold-result-foul { color: #c0a040; }
-
-@keyframes result-pop {
-  0% { transform: scale(0.7); opacity: 0; }
-  60% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); }
-}
-
-/* === Contact Area === */
-.dice-row {
-  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  min-height: 110px;
 }
 
-.dice-label {
-  font-size: 14px;
-  color: var(--text-dim);
-  width: 60px;
+/* === Die Face === */
+.die-face {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 7px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
   flex-shrink: 0;
 }
 
-.dice-group {
+.die-face .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  align-self: center;
+  justify-self: center;
+}
+
+.die-red { background: #c0392b; }
+.die-green { background: #27ae60; }
+.die-gray { background: #636e72; }
+
+/* === Center Column === */
+#center-col {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  position: relative;
 }
 
-.dice-total {
-  font-size: 20px;
-  font-weight: 700;
-  margin-left: auto;
-}
-
-#contact-result {
-  text-align: center;
-  font-size: 24px;
-  font-weight: 700;
-  padding: 8px 0;
-  color: var(--gold);
-}
-
-/* === Card Hand === */
-#card-hand {
-  padding: 8px 0;
-}
-
-#card-hand-label {
-  text-align: center;
-  font-size: 14px;
-  color: var(--text-dim);
-  margin-bottom: 8px;
-}
-
-#cards-container {
+/* === Outcome Bar === */
+#outcome-bar {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 4px 0;
-  -webkit-overflow-scrolling: touch;
+  height: 30px;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #444;
 }
 
-.card {
-  flex: 0 0 auto;
-  width: 100px;
-  padding: 10px 8px;
-  background: var(--surface);
-  border: 2px solid #444;
-  border-radius: var(--radius);
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s;
-}
-
-.card:active { transform: scale(0.95); }
-
-.card-selected {
-  border-color: var(--gold);
-  background: #1e2d50;
-}
-
-.card-name {
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.card-type {
-  font-size: 11px;
-  color: var(--text-dim);
-  margin-bottom: 4px;
-}
-
-.card-desc {
-  font-size: 11px;
-  color: var(--text-dim);
-  line-height: 1.3;
-}
-
-/* === Passive Display === */
-#passive-display {
-  text-align: center;
-  padding: 6px 0;
-  font-size: 14px;
-}
-
-.passive-label { color: var(--text-dim); }
-
-#passive-name {
-  font-weight: 700;
-  color: var(--blue);
-  margin-left: 6px;
-}
-
-/* === Burn Card Hand === */
-#burn-hand {
-  padding: 8px 0;
-}
-
-#burn-hand-label {
-  text-align: center;
-  font-size: 14px;
-  color: var(--text-dim);
-  margin-bottom: 8px;
-}
-
-#burn-cards-container {
+.ob-seg {
+  flex: 1;
   display: flex;
-  gap: 8px;
+  align-items: center;
   justify-content: center;
-  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.burn-card {
-  border-color: var(--accent);
-  width: 110px;
+.ob-strike { background: rgba(233,69,96,0.2); color: var(--red); }
+.ob-foul { background: rgba(192,160,64,0.15); color: #c0a040; }
+.ob-ball { background: rgba(76,175,80,0.2); color: var(--green); }
+.ob-contact { background: rgba(240,192,64,0.2); color: var(--gold); }
+
+#ob-indicator {
+  position: absolute;
+  width: 25%;
+  height: 100%;
+  top: 0;
+  left: 25%; /* starts at Foul */
+  background: rgba(255,255,255,0.12);
+  border: 2px solid rgba(255,255,255,0.5);
+  border-radius: 5px;
+  transition: left 0.4s ease-in-out;
+  pointer-events: none;
 }
 
-.burn-card.card-selected {
-  border-color: var(--gold);
-  background: #2a1a1a;
-  box-shadow: 0 0 8px rgba(240, 192, 64, 0.3);
+/* === Battle Zone === */
+#battle-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+  min-height: 130px;
+}
+
+.battle-lane {
+  position: relative;
+  height: 56px;
+  border-radius: 6px;
+}
+
+.battle-die {
+  position: absolute;
+  top: 4px;
+  transition: left 0.5s ease-in-out, right 0.5s ease-in-out, opacity 0.3s, transform 0.5s;
+}
+
+.die-loser {
+  opacity: 0 !important;
+  transform: scale(0.3) !important;
+}
+
+.battle-lane.impact {
+  background: rgba(255,255,255,0.1);
+}
+
+/* Flying dice (animate from battle zone to outcome bar) */
+.flying-die {
+  position: absolute;
+  z-index: 10;
+  transition: all 0.6s ease-in-out;
+  pointer-events: none;
 }
 
 /* === Action Button === */
 #action-area {
-  padding: 10px 0;
-  margin-top: auto;
+  padding: 8px 0;
 }
 
 #action-btn {
   width: 100%;
-  min-height: 56px;
+  min-height: 52px;
   font-size: 20px;
   font-weight: 700;
   font-family: var(--font);
@@ -411,20 +268,97 @@ html, body {
 
 /* === Game Log === */
 #game-log {
-  max-height: 120px;
+  max-height: 100px;
   overflow-y: auto;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-dim);
-  padding: 6px 0;
+  padding: 4px 0;
   border-top: 1px solid #333;
 }
 
-#log-entries { display: flex; flex-direction: column; gap: 2px; }
+#log-entries { display: flex; flex-direction: column; gap: 1px; }
 
-.log-entry { padding: 2px 0; }
+.log-entry { padding: 1px 0; }
 .log-highlight { color: var(--gold); font-weight: 600; }
 
-/* === Inning Summary Overlay === */
+/* === Contact Modal === */
+#contact-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+#field-view {
+  position: relative;
+  width: 94%;
+  max-width: 400px;
+  aspect-ratio: 300 / 280;
+}
+
+#baseball-field {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+}
+
+#field-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.field-die {
+  position: absolute;
+  transition: all 0.8s ease-in-out;
+  z-index: 5;
+}
+
+#contact-outcome {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#contact-outcome.show { opacity: 1; }
+
+#contact-outcome.outcome-out { color: var(--red); }
+#contact-outcome.outcome-hit { color: var(--green); }
+#contact-outcome.outcome-hr { color: var(--gold); font-size: 36px; }
+
+#contact-roll-btn {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 120px;
+  min-height: 44px;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font);
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  z-index: 10;
+}
+
+/* === Inning Summary === */
 #inning-summary {
   position: fixed;
   inset: 0;
@@ -479,13 +413,35 @@ html, body {
   cursor: pointer;
 }
 
-/* === Dice animation === */
-@keyframes dice-pop {
-  0% { transform: scale(0.5) rotate(-20deg); opacity: 0; }
-  60% { transform: scale(1.1) rotate(5deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+/* === Animations === */
+@keyframes indicator-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
 }
 
-.die-animate {
-  animation: dice-pop 0.3s ease-out;
+.ob-shake {
+  animation: indicator-shake 0.4s ease-in-out;
+}
+
+@keyframes impact-flash {
+  0% { background: transparent; }
+  50% { background: rgba(255,255,255,0.15); }
+  100% { background: transparent; }
+}
+
+.impact-flash {
+  animation: impact-flash 0.3s ease-out;
+}
+
+@keyframes result-pop {
+  0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
+  60% { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+.result-pop {
+  animation: result-pop 0.4s ease-out forwards;
 }
