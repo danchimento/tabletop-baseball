@@ -10,7 +10,7 @@ const BATTERS = [
   { name: 'Rookie',  profile: 'Weak',    baseDice: 2, powerDice: 2, totalBonus: 0 },
 ];
 
-const PITCHER_BASE_DICE = 2;
+const PITCHER_BASE_DICE = 3;
 
 const CARD_ARCHETYPES = [
   {
@@ -62,7 +62,20 @@ const CONTACT_THRESHOLDS = [
   { min: 0,  outcome: 'ground_out', label: 'Ground Out' },
 ];
 
+// Pair thresholds: how many pairs batter must win for ball/contact
+// Based on number of active pairs (min of batter dice, pitcher dice)
+const PAIR_THRESHOLDS = {
+  2: { ball: 1, contact: 2 },
+  3: { ball: 1, contact: 2 },
+  4: { ball: 2, contact: 3 },
+  5: { ball: 2, contact: 3 },
+  6: { ball: 3, contact: 4 },
+};
+
 const OUTS_PER_INNING = 3;
+
+const REVEAL_PAIR_DELAY = 700;
+const REVEAL_RESULT_DELAY = 600;
 
 // ============================================================
 // SECTION B: Game State
@@ -77,11 +90,12 @@ function freshState() {
     runners: [false, false, false], // [1st, 2nd, 3rd]
     currentBatterIndex: 0,
     count: { balls: 0, strikes: 0 },
-    phase: 'SELECT_CARD', // SELECT_CARD | ROLLING | CONTACT | AT_BAT_RESULT | INNING_OVER
+    phase: 'SELECT_CARD', // SELECT_CARD | ROLLING | REVEALING | CONTACT | AT_BAT_RESULT | INNING_OVER
     batterCard: null,
     pitcherCard: null,
     hand: [],
     lastRoll: null,
+    pairData: null,   // { pairs, revealedCount, wins, losses, ties, result, thresholds, numPairs }
     contactResult: null,
     atBatResult: null,
     gameLog: [],
@@ -145,11 +159,33 @@ function applyManipulation(dice, opponentCard) {
   return modified;
 }
 
-function compareTotals(batterTotal, pitcherTotal) {
-  const diff = batterTotal - pitcherTotal;
-  if (diff >= 4) return 'contact';
-  if (diff > 0) return 'ball';
-  return 'strike'; // tie goes to pitcher
+function comparePairs(batterDice, pitcherDice) {
+  const bSorted = [...batterDice].sort((a, b) => b - a);
+  const pSorted = [...pitcherDice].sort((a, b) => b - a);
+  const numPairs = Math.min(bSorted.length, pSorted.length);
+
+  const pairs = [];
+  let wins = 0, losses = 0, ties = 0;
+
+  for (let i = 0; i < numPairs; i++) {
+    const bDie = bSorted[i];
+    const pDie = pSorted[i];
+    let outcome;
+    if (bDie > pDie) { outcome = 'win'; wins++; }
+    else if (pDie > bDie) { outcome = 'loss'; losses++; }
+    else { outcome = 'tie'; ties++; }
+    pairs.push({ batterDie: bDie, pitcherDie: pDie, outcome });
+  }
+
+  const thresholds = PAIR_THRESHOLDS[numPairs] || PAIR_THRESHOLDS[2];
+
+  let result;
+  if (wins >= thresholds.contact) result = 'contact';
+  else if (wins >= thresholds.ball) result = 'ball';
+  else if (wins === losses) result = 'foul';
+  else result = 'strike';
+
+  return { pairs, wins, losses, ties, result, thresholds, numPairs };
 }
 
 function resolveContactOutcome(powerDiceTotal) {
@@ -192,6 +228,7 @@ function startAtBat() {
   state.pitcherCard = aiSelectCard();
   state.hand = generateHand();
   state.lastRoll = null;
+  state.pairData = null;
   state.contactResult = null;
   state.atBatResult = null;
   state.phase = 'SELECT_CARD';
@@ -229,25 +266,59 @@ function rollPitch() {
   batterDice = applyManipulation(batterDice, state.pitcherCard);
   pitcherDice = applyManipulation(pitcherDice, state.batterCard);
 
-  const batterTotal = sumDice(batterDice) + batter.totalBonus;
-  const pitcherTotal = sumDice(pitcherDice);
+  // Compare using paired dice
+  const comparison = comparePairs(batterDice, pitcherDice);
 
-  const result = compareTotals(batterTotal, pitcherTotal);
+  state.pairData = {
+    ...comparison,
+    revealedCount: 0,
+    batterDice,
+    pitcherDice,
+  };
+  state.lastRoll = { batterDice, pitcherDice, result: comparison.result };
 
-  state.lastRoll = { batterDice, pitcherDice, batterTotal, pitcherTotal, result };
+  state.phase = 'REVEALING';
+  render();
 
-  // Update count
+  // Start the pair-by-pair reveal
+  setTimeout(revealNextPair, 400);
+}
+
+function revealNextPair() {
+  if (!state.pairData || state.phase !== 'REVEALING') return;
+
+  state.pairData.revealedCount++;
+  render();
+
+  if (state.pairData.revealedCount < state.pairData.pairs.length) {
+    setTimeout(revealNextPair, REVEAL_PAIR_DELAY);
+  } else {
+    setTimeout(finishReveal, REVEAL_RESULT_DELAY);
+  }
+}
+
+function finishReveal() {
+  if (state.phase !== 'REVEALING') return;
+
+  const pd = state.pairData;
+  const result = pd.result;
+
   const multiplier_batter = (state.pitcherCard && state.pitcherCard.effect.highRisk && result === 'ball') ? 2 : 1;
-  const multiplier_pitcher = (state.batterCard && state.batterCard.effect.highRisk && result === 'strike') ? 2 : 1;
+  const multiplier_pitcher = (state.batterCard && state.batterCard.effect.highRisk && (result === 'strike' || result === 'foul')) ? 2 : 1;
 
   if (result === 'strike') {
-    state.count.strikes += (1 * multiplier_pitcher);
-    addLog(`Pitch: ${batterTotal} vs ${pitcherTotal} — Strike!${multiplier_pitcher > 1 ? ' (Double!)' : ''}`);
+    state.count.strikes += multiplier_pitcher;
+    addLog(`${pd.wins}/${pd.numPairs} pairs won — Strike!${multiplier_pitcher > 1 ? ' (Double!)' : ''}`);
+  } else if (result === 'foul') {
+    // Foul = strike, but can't strike out on a foul (cap at 2)
+    const newStrikes = Math.min(state.count.strikes + multiplier_pitcher, 2);
+    state.count.strikes = newStrikes;
+    addLog(`${pd.wins}/${pd.numPairs} pairs won (tied ${pd.wins}-${pd.losses}) — Foul Ball`);
   } else if (result === 'ball') {
-    state.count.balls += (1 * multiplier_batter);
-    addLog(`Pitch: ${batterTotal} vs ${pitcherTotal} — Ball.${multiplier_batter > 1 ? ' (Double!)' : ''}`);
+    state.count.balls += multiplier_batter;
+    addLog(`${pd.wins}/${pd.numPairs} pairs won — Ball${multiplier_batter > 1 ? ' (Double!)' : ''}`);
   } else {
-    addLog(`Pitch: ${batterTotal} vs ${pitcherTotal} — Contact!`);
+    addLog(`${pd.wins}/${pd.numPairs} pairs won — Contact!`);
   }
 
   // Check terminal states
@@ -267,6 +338,7 @@ function rollPitch() {
     return;
   }
 
+  state.phase = 'ROLLING';
   render();
 }
 
@@ -468,17 +540,68 @@ function renderBatterInfo() {
 
 function renderDiceArea() {
   const area = $('dice-area');
-  if (!state.lastRoll || state.phase === 'SELECT_CARD') {
+  if (!state.pairData || state.phase === 'SELECT_CARD') {
     area.classList.add('hidden');
     return;
   }
   area.classList.remove('hidden');
 
-  const roll = state.lastRoll;
-  $('batter-dice').innerHTML = roll.batterDice.map(d => `<span class="die die-animate">${d}</span>`).join('');
-  $('pitcher-dice').innerHTML = roll.pitcherDice.map(d => `<span class="die die-animate">${d}</span>`).join('');
-  $('batter-total').textContent = `= ${roll.batterTotal}`;
-  $('pitcher-total').textContent = `= ${roll.pitcherTotal}`;
+  const pd = state.pairData;
+  const revealed = pd.revealedCount;
+
+  // Build pair rows
+  let pairsHtml = '';
+  for (let i = 0; i < pd.pairs.length; i++) {
+    const pair = pd.pairs[i];
+    const isRevealed = i < revealed;
+    const outcomeClass = isRevealed ? `pair-${pair.outcome}` : 'pair-pending';
+
+    pairsHtml += `
+      <div class="pair-row ${outcomeClass}">
+        <span class="pair-num">${i + 1}</span>
+        <span class="die ${isRevealed ? 'die-animate pair-die-batter' : 'die-hidden'}">${isRevealed ? pair.batterDie : '?'}</span>
+        <span class="pair-vs">${isRevealed ? 'vs' : ''}</span>
+        <span class="die ${isRevealed ? 'die-animate pair-die-pitcher' : 'die-hidden'}">${isRevealed ? pair.pitcherDie : '?'}</span>
+        <span class="pair-icon">${isRevealed ? (pair.outcome === 'win' ? '✓' : pair.outcome === 'loss' ? '✗' : '—') : ''}</span>
+      </div>`;
+  }
+
+  $('pairs-container').innerHTML = pairsHtml;
+
+  // Build threshold display
+  const thDisplay = $('threshold-display');
+  if (revealed > 0) {
+    thDisplay.classList.remove('hidden');
+
+    let currentWins = 0;
+    for (let i = 0; i < revealed; i++) {
+      if (pd.pairs[i].outcome === 'win') currentWins++;
+    }
+
+    const th = pd.thresholds;
+    const allRevealed = revealed >= pd.pairs.length;
+    const ballMet = currentWins >= th.ball;
+    const contactMet = currentWins >= th.contact;
+
+    thDisplay.innerHTML = `
+      <div class="threshold-wins">Wins: ${currentWins}</div>
+      <div class="threshold-checks">
+        <span class="th-check ${ballMet ? 'th-met' : 'th-unmet'}">
+          Ball (${th.ball}) ${ballMet ? '✓' : '○'}
+        </span>
+        <span class="th-check ${contactMet ? 'th-met' : 'th-unmet'}">
+          Contact (${th.contact}) ${contactMet ? '✓' : '○'}
+        </span>
+      </div>
+      ${allRevealed ? `<div class="threshold-result threshold-result-${pd.result}">${
+        pd.result === 'contact' ? 'CONTACT!' :
+        pd.result === 'ball' ? 'Ball' :
+        pd.result === 'foul' ? 'Foul Ball' :
+        'Strike!'
+      }</div>` : ''}`;
+  } else {
+    thDisplay.classList.add('hidden');
+  }
 }
 
 function renderContactArea() {
@@ -497,7 +620,7 @@ function renderContactArea() {
 
 function renderPitchResult() {
   const el = $('pitch-result');
-  if (!state.lastRoll || state.phase === 'SELECT_CARD') {
+  if (!state.lastRoll || state.phase === 'SELECT_CARD' || state.phase === 'REVEALING') {
     el.classList.add('hidden');
     return;
   }
@@ -521,6 +644,9 @@ function renderPitchResult() {
   } else if (r === 'strike') {
     resultEl.textContent = 'Strike!';
     resultEl.className = 'result-strike';
+  } else if (r === 'foul') {
+    resultEl.textContent = 'Foul Ball';
+    resultEl.className = 'result-foul';
   } else if (r === 'ball') {
     resultEl.textContent = 'Ball';
     resultEl.className = 'result-ball';
@@ -578,6 +704,11 @@ function renderActionButton() {
       btn.textContent = 'Roll Dice';
       btn.disabled = false;
       btn.onclick = rollPitch;
+      break;
+    case 'REVEALING':
+      btn.textContent = 'Matching pairs...';
+      btn.disabled = true;
+      btn.onclick = null;
       break;
     case 'CONTACT':
       btn.textContent = 'Roll Power Dice';
