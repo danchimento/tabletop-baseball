@@ -1,22 +1,22 @@
 # Dice Baseball — Game Design Handoff
 
-**Status:** Design Complete → Ready for MVP Build
+**Status:** MVP Playable → Iterating on Core Mechanics
 **Date:** March 11, 2026
 
 ---
 
 ## Concept
 
-A baseball-themed dice and card game playable in a mobile browser. One inning = one session (~5-7 minutes). Single-player vs AI. Built as a web app (HTML/CSS/JS), mobile-first, PWA-capable.
+A baseball-themed dice and card game playable in a mobile browser. One inning = one session (~3-5 minutes). Single-player vs AI. Built as a web app (HTML/CSS/JS), mobile-first, PWA-capable.
 
 ---
 
 ## Core Loop
 
-1. **Batter steps up** — you see your hand of cards
-2. **Pick a card** for the at-bat (one card per AB, stays for all pitches)
-3. **Pitch-by-pitch dice rolls** — pitcher total vs batter total each pitch
-4. **Resolve count** — strikes, balls, contact, or outcome
+1. **Batter steps up** — pitch clock starts counting down
+2. **Pitch auto-fires** when clock hits zero (no manual button)
+3. **Dice battle** — pitcher and batter dice roll, sort, and clash automatically
+4. **Value-based outcome** — winning die values move an indicator on a bar; final position determines strike/foul/ball/contact
 5. **Repeat** until 3 outs → inning over
 
 ---
@@ -24,14 +24,19 @@ A baseball-themed dice and card game playable in a mobile browser. One inning = 
 ## Dice System
 
 - **All D6.** No other dice.
-- **Base pool:** Both pitcher and batter roll **2D6**
-- **Cards modify pools:** Add/remove dice from either side, or add/subtract from totals
-- **Compare totals each pitch:**
-  - Pitcher total > Batter total → **Strike**
-  - Batter total > Pitcher total → **Ball**
-  - Batter total beats Pitcher by **4+** → **Contact** → roll outcome dice
+- **Configurable pool:** Pitcher and batter dice count adjustable (1-4 each, default 2v2)
+- **Paired battle:** Dice sorted highest-first, compared pair-by-pair
+- **Value-based outcome bar:** Winning die's face value moves the indicator by that amount (not just +1/-1)
+  - Batter wins → indicator moves right by die value
+  - Pitcher wins → indicator moves left by die value
+  - Tie → indicator shakes, no movement
+- **Configurable thresholds** determine outcome:
+  - Hit: >= 7 (default)
+  - Ball: >= 5
+  - Foul: >= -2
+  - Strike: < -2
 - **Counts:** 3 strikes = strikeout (out). 4 balls = walk (runner on base).
-- **Contact outcome:** Batter rolls power dice (number varies by batter strength). Higher total = better hit result (ground out, single, double, HR — exact thresholds TBD).
+- **Contact outcome:** 2d6 roll on baseball field, sum maps to field position and outcome
 
 ---
 
@@ -74,15 +79,15 @@ A baseball-themed dice and card game playable in a mobile browser. One inning = 
 
 | Metric             | Target         |
 |---------------------|---------------|
-| Session length      | 5-7 min        |
+| Session length      | 3-5 min        |
 | Rolls per inning    | ~17            |
-| Time per roll       | ~4-5 sec       |
+| Time per roll       | ~2-3 sec       |
 | Card decisions/inning | ~4-5        |
 | Time per card decision | 3-5 sec    |
-| Half-inning         | ~90 sec        |
-| Full inning (pitch + bat) | ~3 min  |
+| Half-inning         | ~60 sec        |
+| Full inning (pitch + bat) | ~2 min  |
 
-Leaves ~3-4 min of headroom for animations, transitions, and flair within the 7-min budget.
+Animations are ~50% faster than original design to keep pace snappy.
 
 ---
 
@@ -91,21 +96,23 @@ Leaves ~3-4 min of headroom for animations, transitions, and flair within the 7-
 ### In
 - Single-player: **you bat** against an AI pitcher
 - **One inning** = one game session
-- D6 dice pool system with automatic total comparison
-- **3-5 pitch cards** to choose from per at-bat
-- Mobile-first touch UI — big buttons, tap to roll
+- D6 dice pool system with value-based outcome bar
+- **Configurable dice counts and thresholds** via debug sliders
+- Mobile-first touch UI — pitch clock auto-drives gameplay
 - Score, outs, runners, and count tracked on screen
+- Baseball hit animation (fly balls, ground balls, catch markers)
 - Web app (HTML/CSS/JS) — runs in mobile browser, no install
+- Debug controls for rapid testing
 
 ### Out (Future)
+- Card system (designed, hidden until mechanics finalized)
 - Pitching mode (you pitch, AI bats)
 - Full game (multiple innings)
 - Deck-building / roguelike progression
 - Multiplayer
 - Energy system for pitcher
 - Card unlocks / progression
-- Combo/synergy and conditional card archetypes
-- Art, animations, sound
+- Sound effects
 
 ---
 
@@ -113,7 +120,7 @@ Leaves ~3-4 min of headroom for animations, transitions, and flair within the 7-
 
 - **Platform:** Mobile web (PWA-capable)
 - **Stack:** HTML + CSS + vanilla JS (no framework for MVP)
-- **Touch-first UI:** Large tap targets, swipe/tap to roll dice
+- **Touch-first UI:** Large tap targets, automatic pitch progression
 - **No backend needed** for MVP — all client-side
 
 ---
@@ -127,14 +134,13 @@ Leaves ~3-4 min of headroom for animations, transitions, and flair within the 7-
 
 ---
 
-## Open Design Questions (to resolve during build or next session)
+## Open Design Questions (to resolve during iteration)
 
-1. **Contact outcome thresholds** — exact power dice totals for ground out / single / double / HR
+1. **Threshold tuning** — optimal values for strike/foul/ball/hit with value-based system
 2. **AI pitcher logic** — random card selection? Weighted by game state?
-3. **Lineup** — fixed 5-batter lineup for MVP, or random?
-4. **Runner advancement** — simplified (single = 1 base, double = 2, etc.) or situational?
-5. **High-risk card penalty** — "lose by double" or something simpler?
-6. **Manipulation cards (rerolls)** — when exactly do they trigger if card is chosen per-AB?
+3. **Dice count balance** — how many dice per side feels right?
+4. **Card integration** — when to bring back the card system
+5. **Multi-inning** — session length for full games
 
 ---
 
