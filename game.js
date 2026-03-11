@@ -705,7 +705,10 @@ function updateButton() {
     case 'INNING_OVER':
       btn.textContent = 'View Summary';
       btn.disabled = false;
-      btn.onclick = () => $('inning-summary').classList.remove('hidden');
+      btn.onclick = () => {
+        renderSummary();
+        $('inning-summary').classList.remove('hidden');
+      };
       break;
   }
 }
