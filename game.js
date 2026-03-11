@@ -705,7 +705,10 @@ function updateButton() {
     case 'INNING_OVER':
       btn.textContent = 'View Summary';
       btn.disabled = false;
-      btn.onclick = () => $('inning-summary').classList.remove('hidden');
+      btn.onclick = () => {
+        renderSummary();
+        $('inning-summary').classList.remove('hidden');
+      };
       break;
   }
 }
@@ -787,16 +790,49 @@ function startAtBat() {
 }
 
 // ============================================================
-// SECTION M: Init
+// SECTION M: Debug Overlay
+// ============================================================
+
+function showError(msg) {
+  let box = document.getElementById('error-overlay');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'error-overlay';
+    box.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow:auto;' +
+      'background:rgba(200,0,0,0.95);color:#fff;font:12px monospace;padding:8px;z-index:9999;';
+    document.body.appendChild(box);
+  }
+  const line = document.createElement('div');
+  line.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
+  line.style.padding = '4px 0';
+  line.textContent = msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+window.onerror = function(msg, src, line, col, err) {
+  showError(`${msg} (${src}:${line}:${col})`);
+};
+
+window.addEventListener('unhandledrejection', function(e) {
+  showError('Unhandled promise: ' + (e.reason?.message || e.reason));
+});
+
+// ============================================================
+// SECTION N: Init
 // ============================================================
 
 function init() {
-  $('replay-btn').addEventListener('click', () => {
-    $('inning-summary').classList.add('hidden');
-    startInning();
-  });
+  try {
+    $('replay-btn').addEventListener('click', () => {
+      $('inning-summary').classList.add('hidden');
+      startInning();
+    });
 
-  startInning();
+    startInning();
+  } catch (e) {
+    showError('init: ' + e.message + ' @ ' + e.stack?.split('\n')[1]);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
