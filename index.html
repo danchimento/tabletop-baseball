@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Dice Baseball</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <div id="app">
@@ -30,29 +30,33 @@
       </div>
     </div>
 
+    <!-- Player Names Row -->
+    <div id="player-row">
+      <div class="player-label pitcher-label">Pitcher</div>
+      <div class="player-label batter-label" id="batter-name">Batter</div>
+    </div>
+
+    <!-- Outcome Bar (full width, below names) -->
+    <div id="outcome-bar">
+      <div id="ob-track">
+        <div id="ob-indicator"></div>
+        <div id="ob-zero-mark"></div>
+      </div>
+      <div id="ob-labels">
+        <span class="ob-label ob-label-strike">K</span>
+        <span class="ob-label ob-label-foul">Foul</span>
+        <span class="ob-label ob-label-ball">Ball</span>
+        <span class="ob-label ob-label-hit">Hit!</span>
+      </div>
+    </div>
+
     <!-- Battlefield -->
     <div id="battlefield">
       <div id="pitcher-side">
-        <div class="player-label">Pitcher</div>
-        <div id="pitch-clock">
-          <svg viewBox="0 0 44 44" width="40" height="40">
-            <circle cx="22" cy="22" r="19" fill="none" stroke="#333" stroke-width="2"/>
-            <circle id="clock-ring" cx="22" cy="22" r="19" fill="none" stroke="#e94560" stroke-width="2.5"
-                    stroke-dasharray="119.38" stroke-dashoffset="0"
-                    transform="rotate(-90 22 22)" stroke-linecap="round"/>
-          </svg>
-        </div>
         <div id="pitcher-dice" class="dice-col"></div>
       </div>
 
       <div id="center-col">
-        <div id="outcome-bar">
-          <div class="ob-seg ob-strike"><span>K</span></div>
-          <div class="ob-seg ob-foul"><span>Foul</span></div>
-          <div class="ob-seg ob-ball"><span>Ball</span></div>
-          <div class="ob-seg ob-contact"><span>Hit!</span></div>
-          <div id="ob-indicator"></div>
-        </div>
         <div id="battle-zone">
           <div class="battle-lane" id="lane-0"></div>
           <div class="battle-lane" id="lane-1"></div>
@@ -60,7 +64,6 @@
       </div>
 
       <div id="batter-side">
-        <div class="player-label" id="batter-name">Batter</div>
         <div id="batter-dice" class="dice-col"></div>
       </div>
     </div>
@@ -70,58 +73,91 @@
       <button id="action-btn" disabled>Loading...</button>
     </div>
 
-    <!-- Game Log -->
-    <div id="game-log">
-      <div id="log-entries"></div>
+    <!-- Debug Controls -->
+    <div id="debug-controls">
+      <button id="test-hit-btn">Test Hit</button>
+      <div class="slider-group">
+        <label>Pitcher Dice: <span id="pitcher-dice-count">2</span></label>
+        <input type="range" id="pitcher-dice-slider" min="1" max="4" value="2">
+      </div>
+      <div class="slider-group">
+        <label>Batter Dice: <span id="batter-dice-count">2</span></label>
+        <input type="range" id="batter-dice-slider" min="1" max="4" value="2">
+      </div>
+      <div class="slider-group">
+        <label>Ball threshold: <span id="ball-thresh-val">5</span></label>
+        <input type="range" id="ball-thresh" min="2" max="8" value="5">
+      </div>
+      <div class="slider-group">
+        <label>Hit threshold: <span id="hit-thresh-val">7</span></label>
+        <input type="range" id="hit-thresh" min="3" max="12" value="7">
+      </div>
+      <div class="slider-group">
+        <label>Foul min: <span id="foul-min-val">-2</span></label>
+        <input type="range" id="foul-min" min="-6" max="0" value="-2">
+      </div>
+      <div class="slider-group">
+        <label>Strike threshold: <span id="strike-thresh-val">-3</span></label>
+        <input type="range" id="strike-thresh" min="-8" max="-1" value="-3">
+      </div>
+    </div>
+
+    <!-- Pitch Clock Overlay -->
+    <div id="pitch-clock-overlay">
+      <div id="pitch-clock-display">
+        <span id="pitch-clock-time">15</span>
+      </div>
     </div>
 
     <!-- Contact Modal -->
     <div id="contact-modal" class="hidden">
-      <div id="field-view">
-        <svg id="baseball-field" viewBox="0 0 300 280">
-          <!-- Background -->
-          <rect width="300" height="280" fill="#1a3a1a"/>
-          <!-- Outfield grass -->
-          <path d="M 150 260 L 8.6 118.6 A 200 200 0 0 1 291.4 118.6 Z" fill="#2d5a1e"/>
-          <!-- Infield dirt -->
-          <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="#8B6914" opacity="0.5"/>
+      <div id="contact-wrapper">
+        <div id="field-view">
+          <svg id="baseball-field" viewBox="0 0 300 280">
+            <!-- Background -->
+            <rect width="300" height="280" fill="#1a3a1a"/>
+            <!-- Outfield grass -->
+            <path d="M 150 260 L 8.6 118.6 A 200 200 0 0 1 291.4 118.6 Z" fill="#2d5a1e"/>
+            <!-- Infield dirt -->
+            <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="#8B6914" opacity="0.5"/>
 
-          <!-- Zone overlays -->
-          <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="rgba(233,69,96,0.25)"/>
-          <path d="M 107.6 217.6 A 60 60 0 0 1 192.4 217.6 L 217.2 192.8 A 95 95 0 0 0 82.8 192.8 Z" fill="rgba(76,175,80,0.25)"/>
-          <path d="M 82.8 192.8 A 95 95 0 0 1 217.2 192.8 L 245.5 164.5 A 135 135 0 0 0 54.5 164.5 Z" fill="rgba(233,69,96,0.25)"/>
-          <path d="M 54.5 164.5 A 135 135 0 0 1 245.5 164.5 L 266.7 143.3 A 165 165 0 0 0 33.3 143.3 Z" fill="rgba(76,175,80,0.25)"/>
-          <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3 L 284.4 125.6 A 190 190 0 0 0 15.6 125.6 Z" fill="rgba(76,175,80,0.3)"/>
+            <!-- Zone overlays -->
+            <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="rgba(233,69,96,0.25)"/>
+            <path d="M 107.6 217.6 A 60 60 0 0 1 192.4 217.6 L 217.2 192.8 A 95 95 0 0 0 82.8 192.8 Z" fill="rgba(76,175,80,0.25)"/>
+            <path d="M 82.8 192.8 A 95 95 0 0 1 217.2 192.8 L 245.5 164.5 A 135 135 0 0 0 54.5 164.5 Z" fill="rgba(233,69,96,0.25)"/>
+            <path d="M 54.5 164.5 A 135 135 0 0 1 245.5 164.5 L 266.7 143.3 A 165 165 0 0 0 33.3 143.3 Z" fill="rgba(76,175,80,0.25)"/>
+            <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3 L 284.4 125.6 A 190 190 0 0 0 15.6 125.6 Z" fill="rgba(76,175,80,0.3)"/>
 
-          <!-- Fence -->
-          <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3" fill="none" stroke="#654" stroke-width="3"/>
-          <!-- Foul lines -->
-          <line x1="150" y1="260" x2="8.6" y2="118.6" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-          <line x1="150" y1="260" x2="291.4" y2="118.6" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-          <!-- Base diamond -->
-          <polygon points="150,260 180,230 150,200 120,230" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
-          <rect x="147" y="257" width="6" height="6" fill="#fff" transform="rotate(45,150,260)"/>
-          <rect x="177" y="227" width="6" height="6" fill="#fff" transform="rotate(45,180,230)"/>
-          <rect x="147" y="197" width="6" height="6" fill="#fff" transform="rotate(45,150,200)"/>
-          <rect x="117" y="227" width="6" height="6" fill="#fff" transform="rotate(45,120,230)"/>
+            <!-- Fence -->
+            <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3" fill="none" stroke="#654" stroke-width="3"/>
+            <!-- Foul lines -->
+            <line x1="150" y1="260" x2="8.6" y2="118.6" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+            <line x1="150" y1="260" x2="291.4" y2="118.6" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+            <!-- Base diamond -->
+            <polygon points="150,260 180,230 150,200 120,230" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+            <rect x="147" y="257" width="6" height="6" fill="#fff" transform="rotate(45,150,260)"/>
+            <rect x="177" y="227" width="6" height="6" fill="#fff" transform="rotate(45,180,230)"/>
+            <rect x="147" y="197" width="6" height="6" fill="#fff" transform="rotate(45,150,200)"/>
+            <rect x="117" y="227" width="6" height="6" fill="#fff" transform="rotate(45,120,230)"/>
 
-          <!-- Number markers -->
-          <g font-size="11" font-weight="700" text-anchor="middle" fill="#fff">
-            <circle cx="128" cy="232" r="11" fill="rgba(0,0,0,0.5)"/><text x="128" y="236">2</text>
-            <circle cx="153" cy="222" r="11" fill="rgba(0,0,0,0.5)"/><text x="153" y="226">3</text>
-            <circle cx="175" cy="235" r="11" fill="rgba(0,0,0,0.5)"/><text x="175" y="239">4</text>
-            <circle cx="82" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="82" y="176">5</text>
-            <circle cx="150" cy="150" r="11" fill="rgba(0,0,0,0.5)"/><text x="150" y="154">6</text>
-            <circle cx="218" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="218" y="176">7</text>
-            <circle cx="108" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="108" y="202">8</text>
-            <circle cx="192" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="192" y="202">9</text>
-            <circle cx="52" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="52" y="152">10</text>
-            <circle cx="248" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="248" y="152">11</text>
-            <circle cx="150" cy="85" r="13" fill="rgba(240,192,64,0.8)" stroke="#fff" stroke-width="1.5"/><text x="150" y="89" fill="#000">12</text>
-          </g>
-        </svg>
-        <div id="field-overlay"></div>
-        <div id="contact-outcome"></div>
+            <!-- Number markers -->
+            <g font-size="11" font-weight="700" text-anchor="middle" fill="#fff">
+              <circle cx="128" cy="232" r="11" fill="rgba(0,0,0,0.5)"/><text x="128" y="236">2</text>
+              <circle cx="153" cy="222" r="11" fill="rgba(0,0,0,0.5)"/><text x="153" y="226">3</text>
+              <circle cx="175" cy="235" r="11" fill="rgba(0,0,0,0.5)"/><text x="175" y="239">4</text>
+              <circle cx="82" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="82" y="176">5</text>
+              <circle cx="150" cy="150" r="11" fill="rgba(0,0,0,0.5)"/><text x="150" y="154">6</text>
+              <circle cx="218" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="218" y="176">7</text>
+              <circle cx="108" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="108" y="202">8</text>
+              <circle cx="192" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="192" y="202">9</text>
+              <circle cx="52" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="52" y="152">10</text>
+              <circle cx="248" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="248" y="152">11</text>
+              <circle cx="150" cy="85" r="13" fill="rgba(240,192,64,0.8)" stroke="#fff" stroke-width="1.5"/><text x="150" y="89" fill="#000">12</text>
+            </g>
+          </svg>
+          <div id="field-overlay"></div>
+          <div id="contact-outcome"></div>
+        </div>
         <button id="contact-roll-btn" class="hidden">Roll!</button>
       </div>
     </div>
@@ -137,6 +173,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=2" defer></script>
+  <script src="game.js?v=3" defer></script>
 </body>
 </html>

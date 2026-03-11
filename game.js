@@ -1,5 +1,5 @@
 // ============================================================
-// SECTION A: Constants
+// SECTION A: Constants & Config
 // ============================================================
 
 const BATTERS = [
@@ -10,7 +10,17 @@ const BATTERS = [
   { name: 'Rookie',  profile: 'Weak',    baseDice: 2, powerDice: 2 },
 ];
 
-const PITCHER_BASE_DICE = 2; // 2v2 for now
+let PITCHER_DICE_COUNT = 2;
+let BATTER_DICE_COUNT = 2;
+
+// Outcome bar thresholds (value-based, 0 in center)
+// Positive = batter side, negative = pitcher side
+let THRESHOLDS = {
+  hit: 7,       // >= this is a hit
+  ball: 5,      // >= this and < hit is ball
+  foulMin: -2,  // >= this and < ball is foul
+  strike: -3,   // < foulMin is strike (i.e. <= strike threshold)
+};
 
 const DIE_DOTS = {
   1: [0,0,0, 0,1,0, 0,0,0],
@@ -35,8 +45,6 @@ const CONTACT_MAP = {
   12: { outcome: 'home_run',   label: 'HOME RUN!' },
 };
 
-// Field positions as percentages of the field-view container
-// Matches the SVG viewBox (300x280) number marker positions
 const FIELD_POSITIONS = {
   2:  { x: 42.7, y: 82.9 },
   3:  { x: 51.0, y: 79.3 },
@@ -51,15 +59,18 @@ const FIELD_POSITIONS = {
   12: { x: 50.0, y: 30.4 },
 };
 
-const SPIN_INTERVALS = [50,50,50,60,60,70,80,90,110,140,180,240,320];
+// ~50% faster spin
+const SPIN_INTERVALS = [25,25,25,30,30,35,40,45,55,70,90,120,160];
 
 const OUTS_PER_INNING = 3;
+const PITCH_CLOCK_SECONDS = 8;
 
 // ============================================================
 // SECTION B: State
 // ============================================================
 
 let state = {};
+let pitchClockTimer = null;
 
 function freshState() {
   return {
@@ -136,12 +147,13 @@ async function sortDice(side, values) {
 
   const h = dice[0].offsetHeight + 8;
 
-  dice[0].style.transition = 'transform 0.4s ease-in-out';
-  dice[1].style.transition = 'transform 0.4s ease-in-out';
+  // Animate swap for each pair that needs reordering
+  dice[0].style.transition = 'transform 0.2s ease-in-out';
+  dice[1].style.transition = 'transform 0.2s ease-in-out';
   dice[0].style.transform = `translateY(${h}px)`;
   dice[1].style.transform = `translateY(-${h}px)`;
 
-  await delay(420);
+  await delay(220);
 
   container.insertBefore(dice[1], dice[0]);
   dice[0].style.transition = 'none';
@@ -160,31 +172,31 @@ async function startPitch() {
   state.phase = 'ANIMATING';
   updateButton();
   clearBattlefield();
-  resetOutcomeBar();
 
   state.pitchCount++;
-
-  // Pitch clock animation
-  startPitchClock();
+  stopPitchClock();
 
   // Create and spin pitcher dice
   const pContainer = $('pitcher-dice');
-  const pDie0 = createDieElement('die-red');
-  const pDie1 = createDieElement('die-red');
-  pContainer.appendChild(pDie0);
-  pContainer.appendChild(pDie1);
+  const pDice = [];
+  const pVals = [];
+  for (let i = 0; i < PITCHER_DICE_COUNT; i++) {
+    const die = createDieElement('die-red');
+    pContainer.appendChild(die);
+    pDice.push(die);
+    pVals.push(rollD6());
+  }
 
-  const p0 = rollD6(), p1 = rollD6();
-  await Promise.all([spinDie(pDie0, p0), spinDie(pDie1, p1)]);
-  await delay(500);
+  await Promise.all(pDice.map((d, i) => spinDie(d, pVals[i])));
+  await delay(250);
 
   // Sort pitcher dice (highest first)
-  state.pitcherDice = await sortDice('pitcher', [p0, p1]);
-  await delay(300);
+  state.pitcherDice = await sortDice('pitcher', pVals);
+  await delay(150);
 
-  // Show swing button
+  // Auto-proceed to batter swing
   state.phase = 'BATTER_READY';
-  updateButton();
+  await swingBat();
 }
 
 async function swingBat() {
@@ -193,35 +205,38 @@ async function swingBat() {
 
   // Create and spin batter dice
   const bContainer = $('batter-dice');
-  const bDie0 = createDieElement('die-green');
-  const bDie1 = createDieElement('die-green');
-  bContainer.appendChild(bDie0);
-  bContainer.appendChild(bDie1);
+  const bDice = [];
+  const bVals = [];
+  for (let i = 0; i < BATTER_DICE_COUNT; i++) {
+    const die = createDieElement('die-green');
+    bContainer.appendChild(die);
+    bDice.push(die);
+    bVals.push(rollD6());
+  }
 
-  const b0 = rollD6(), b1 = rollD6();
-  await Promise.all([spinDie(bDie0, b0), spinDie(bDie1, b1)]);
-  await delay(500);
+  await Promise.all(bDice.map((d, i) => spinDie(d, bVals[i])));
+  await delay(250);
 
   // Sort batter dice (highest first)
-  state.batterDice = await sortDice('batter', [b0, b1]);
-  await delay(400);
+  state.batterDice = await sortDice('batter', bVals);
+  await delay(200);
 
   // Fade out side dice
   Array.from($('pitcher-dice').children).forEach(d => {
-    d.style.transition = 'opacity 0.3s';
+    d.style.transition = 'opacity 0.15s';
     d.style.opacity = '0.3';
   });
   Array.from($('batter-dice').children).forEach(d => {
-    d.style.transition = 'opacity 0.3s';
+    d.style.transition = 'opacity 0.15s';
     d.style.opacity = '0.3';
   });
-  await delay(300);
+  await delay(150);
 
   // Run battle
   await runBattle();
-  await delay(400);
+  await delay(200);
 
-  // Run outcome bar
+  // Run outcome
   await runOutcome();
 }
 
@@ -231,8 +246,9 @@ async function swingBat() {
 
 async function runBattle() {
   state.battleResults = [];
+  const pairs = Math.min(state.pitcherDice.length, state.batterDice.length);
 
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < pairs; i++) {
     const pVal = state.pitcherDice[i];
     const bVal = state.batterDice[i];
     let winner, color;
@@ -240,19 +256,19 @@ async function runBattle() {
     else if (pVal > bVal) { winner = 'pitcher'; color = 'red'; }
     else { winner = 'tie'; color = 'gray'; }
 
-    const winValue = winner === 'batter' ? bVal : pVal;
+    const winValue = winner === 'batter' ? bVal : winner === 'pitcher' ? pVal : 0;
     state.battleResults.push({ pVal, bVal, winner, color, winValue });
 
     await animateBattlePair(i, pVal, bVal, winner);
-    await delay(300);
+    await delay(150);
   }
 }
 
 async function animateBattlePair(index, pVal, bVal, winner) {
   const lane = $(`lane-${index}`);
+  if (!lane) return;
   lane.innerHTML = '';
 
-  // Create the two dice at the edges
   const pDie = createDieElement('die-red');
   pDie.classList.add('battle-die');
   pDie.innerHTML = dieFaceHTML(pVal);
@@ -266,38 +282,34 @@ async function animateBattlePair(index, pVal, bVal, winner) {
   lane.appendChild(pDie);
   lane.appendChild(bDie);
 
-  await delay(50);
+  await delay(30);
 
-  // Slide toward center
   const center = lane.offsetWidth / 2;
   pDie.style.left = `${center - 52}px`;
   bDie.style.left = `${center + 4}px`;
 
-  await delay(550);
+  await delay(275);
 
-  // Impact flash
   lane.classList.add('impact-flash');
-  await delay(300);
+  await delay(150);
   lane.classList.remove('impact-flash');
 
-  // Resolve winner
   if (winner === 'batter') {
     pDie.classList.add('die-loser');
-    await delay(400);
+    await delay(200);
     bDie.style.left = `${center - 24}px`;
     bDie.classList.add('winner-die');
-    await delay(300);
+    await delay(150);
   } else if (winner === 'pitcher') {
     bDie.classList.add('die-loser');
-    await delay(400);
+    await delay(200);
     pDie.style.left = `${center - 24}px`;
     pDie.classList.add('winner-die');
-    await delay(300);
+    await delay(150);
   } else {
-    // Tie: both fade, gray die appears
     pDie.classList.add('die-loser');
     bDie.classList.add('die-loser');
-    await delay(200);
+    await delay(100);
 
     const grayDie = createDieElement('die-gray');
     grayDie.classList.add('battle-die', 'winner-die');
@@ -305,77 +317,93 @@ async function animateBattlePair(index, pVal, bVal, winner) {
     grayDie.style.left = `${center - 24}px`;
     grayDie.dataset.value = pVal;
     lane.appendChild(grayDie);
-    await delay(300);
+    await delay(150);
   }
 }
 
 // ============================================================
-// SECTION G: Outcome Bar
+// SECTION G: Outcome Bar (value-based movement)
 // ============================================================
 
-let indicatorPosition = 1; // 0=Strike, 1=Foul, 2=Ball, 3=Contact
+// The bar range: roughly -12 to +12, 0 in the middle
+// Position is a pixel percentage on the bar
+const BAR_MIN = -12;
+const BAR_MAX = 12;
+let indicatorValue = 0;
 
 function resetOutcomeBar() {
-  indicatorPosition = 1;
+  indicatorValue = 0;
+  updateIndicatorPosition(false);
+}
+
+function valueToPercent(val) {
+  // Clamp value to range
+  const clamped = Math.max(BAR_MIN, Math.min(BAR_MAX, val));
+  // Map to 0-100%
+  return ((clamped - BAR_MIN) / (BAR_MAX - BAR_MIN)) * 100;
+}
+
+function updateIndicatorPosition(animate) {
   const indicator = $('ob-indicator');
-  indicator.style.transition = 'none';
-  indicator.style.left = '25%';
+  if (!animate) {
+    indicator.style.transition = 'none';
+    indicator.offsetWidth;
+  } else {
+    indicator.style.transition = 'left 0.2s ease-in-out';
+  }
+  indicator.style.left = valueToPercent(indicatorValue) + '%';
   indicator.classList.remove('ob-shake');
-  // Force reflow
-  indicator.offsetWidth;
-  indicator.style.transition = 'left 0.4s ease-in-out';
 }
 
-function setIndicator(pos) {
-  indicatorPosition = pos;
-  $('ob-indicator').style.left = `${pos * 25}%`;
-}
-
-async function moveIndicator(pos) {
-  indicatorPosition = pos;
-  $('ob-indicator').style.left = `${pos * 25}%`;
-  await delay(450);
+async function moveIndicator(newValue) {
+  indicatorValue = Math.max(BAR_MIN, Math.min(BAR_MAX, newValue));
+  updateIndicatorPosition(true);
+  await delay(225);
 }
 
 async function shakeIndicator() {
   const ind = $('ob-indicator');
   ind.classList.add('ob-shake');
-  await delay(400);
+  await delay(200);
   ind.classList.remove('ob-shake');
 }
 
+function determineOutcome(value) {
+  if (value >= THRESHOLDS.hit) return 'contact';
+  if (value >= THRESHOLDS.ball) return 'ball';
+  if (value >= THRESHOLDS.foulMin) return 'foul';
+  return 'strike';
+}
+
 async function runOutcome() {
+  resetOutcomeBar();
+  await delay(100);
+
   for (let i = 0; i < state.battleResults.length; i++) {
     const result = state.battleResults[i];
 
-    // Animate the winning die from battle lane upward
     await flyDieToBar(i, result.color, result.winValue);
 
-    // Move indicator
     if (result.color === 'green') {
-      const newPos = Math.min(indicatorPosition + 1, 3);
-      await moveIndicator(newPos);
+      await moveIndicator(indicatorValue + result.winValue);
     } else if (result.color === 'red') {
-      const newPos = Math.max(indicatorPosition - 1, 0);
-      await moveIndicator(newPos);
+      await moveIndicator(indicatorValue - result.winValue);
     } else {
       await shakeIndicator();
     }
-    await delay(200);
+    await delay(100);
   }
 
-  // Determine result
-  const outcomes = ['strike', 'foul', 'ball', 'contact'];
-  const pitchResult = outcomes[indicatorPosition];
-
-  await delay(400);
+  const pitchResult = determineOutcome(indicatorValue);
+  await delay(200);
   await processPitchResult(pitchResult);
 }
 
 async function flyDieToBar(laneIndex, color, value) {
   const lane = $(`lane-${laneIndex}`);
+  if (!lane) return;
   const centerCol = $('center-col');
-  const bar = $('outcome-bar');
+  const bar = $('ob-track');
 
   const winnerDie = lane.querySelector('.winner-die');
   if (!winnerDie) return;
@@ -384,7 +412,6 @@ async function flyDieToBar(laneIndex, color, value) {
   const dieRect = winnerDie.getBoundingClientRect();
   const barRect = bar.getBoundingClientRect();
 
-  // Create flying die
   const flyDie = createDieElement(`die-${color}`);
   flyDie.classList.add('flying-die');
   flyDie.innerHTML = dieFaceHTML(value);
@@ -394,18 +421,16 @@ async function flyDieToBar(laneIndex, color, value) {
   flyDie.style.height = '48px';
   centerCol.appendChild(flyDie);
 
-  // Hide original
   winnerDie.style.visibility = 'hidden';
 
-  await delay(50);
+  await delay(30);
 
-  // Fly to bar center
   flyDie.style.left = (barRect.left - colRect.left + barRect.width / 2 - 24) + 'px';
   flyDie.style.top = (barRect.top - colRect.top) + 'px';
   flyDie.style.transform = 'scale(0.3)';
   flyDie.style.opacity = '0';
 
-  await delay(650);
+  await delay(325);
   flyDie.remove();
 }
 
@@ -420,7 +445,7 @@ async function processPitchResult(result) {
     updateCount();
 
     if (state.count.strikes >= 3) {
-      await delay(500);
+      await delay(250);
       resolveAtBatEnd('strikeout');
       return;
     }
@@ -434,23 +459,23 @@ async function processPitchResult(result) {
     updateCount();
 
     if (state.count.balls >= 4) {
-      await delay(500);
+      await delay(250);
       resolveAtBatEnd('walk');
       return;
     }
   } else if (result === 'contact') {
     addLog('Contact!');
-    await delay(600);
+    await delay(300);
     await openContactModal();
     return;
   }
 
-  // Continue at-bat
-  await delay(800);
+  // Continue at-bat: start pitch clock for auto-pitch
+  await delay(400);
   clearBattlefield();
-  resetPitchClock();
   state.phase = 'PRE_PITCH';
   updateButton();
+  startPitchClock();
 }
 
 // ============================================================
@@ -482,6 +507,9 @@ async function rollContactDice() {
   const pos = FIELD_POSITIONS[sum];
 
   const overlay = $('field-overlay');
+  const isOut = result.outcome === 'ground_out';
+  const isOutfield = sum >= 5 && sum <= 7 || sum >= 10;
+  const isHomeRun = result.outcome === 'home_run';
 
   // Create dice near home plate
   const die1 = createDieElement('die-green');
@@ -498,17 +526,67 @@ async function rollContactDice() {
 
   // Spin
   await Promise.all([spinDie(die1, d1), spinDie(die2, d2)]);
-  await delay(600);
+  await delay(300);
 
-  // Animate to field position
-  die1.style.left = `calc(${pos.x}% - 28px)`;
-  die1.style.top = `calc(${pos.y}% - 12px)`;
-  die2.style.left = `calc(${pos.x}%)`;
-  die2.style.top = `calc(${pos.y}% - 12px)`;
+  // Hide dice, show baseball animation
+  die1.style.transition = 'opacity 0.15s';
+  die2.style.transition = 'opacity 0.15s';
+  die1.style.opacity = '0';
+  die2.style.opacity = '0';
+  await delay(150);
+  die1.remove();
+  die2.remove();
 
-  await delay(900);
+  // Create baseball at home plate
+  const ball = document.createElement('div');
+  ball.className = 'baseball';
+  ball.style.left = '48%';
+  ball.style.top = '90%';
+  ball.style.transform = 'scale(1)';
+  overlay.appendChild(ball);
 
-  // Show outcome
+  await delay(50);
+
+  // Fly baseball to target position
+  if (isOutfield || isHomeRun) {
+    // Outfield: ball "flies" - gets bigger then smaller
+    ball.style.transition = 'left 0.35s ease-out, top 0.35s ease-out';
+    // First half: ball goes up and grows
+    const midX = (48 + pos.x) / 2;
+    const midY = (90 + pos.y) / 2 - 10;
+    ball.style.left = midX + '%';
+    ball.style.top = midY + '%';
+    ball.style.transition = 'left 0.35s ease-out, top 0.35s ease-out, transform 0.35s ease-out';
+    ball.style.transform = 'scale(2.5)';
+    await delay(350);
+
+    // Second half: ball descends and shrinks
+    ball.style.left = pos.x + '%';
+    ball.style.top = pos.y + '%';
+    ball.style.transform = 'scale(0.8)';
+    await delay(350);
+  } else {
+    // Infield: ground ball, direct path
+    ball.style.left = pos.x + '%';
+    ball.style.top = pos.y + '%';
+    ball.style.transform = 'scale(0.9)';
+    await delay(500);
+  }
+
+  // If out, replace with X
+  if (isOut) {
+    ball.remove();
+    const marker = document.createElement('div');
+    marker.className = 'catch-marker';
+    marker.textContent = 'X';
+    marker.style.left = pos.x + '%';
+    marker.style.top = pos.y + '%';
+    overlay.appendChild(marker);
+  }
+
+  await delay(200);
+
+  // Show outcome text
   const outcomeEl = $('contact-outcome');
   outcomeEl.textContent = result.label;
   if (result.outcome === 'home_run') {
@@ -520,7 +598,7 @@ async function rollContactDice() {
   }
 
   addLog(`Contact: ${d1}+${d2}=${sum} — ${result.label}`);
-  await delay(1800);
+  await delay(1200);
 
   // Close modal
   $('contact-modal').classList.add('hidden');
@@ -528,7 +606,6 @@ async function rollContactDice() {
   outcomeEl.textContent = '';
   outcomeEl.className = '';
 
-  // Process at-bat result
   resolveAtBatEnd(result.outcome);
 }
 
@@ -582,13 +659,12 @@ function resolveAtBatEnd(outcome) {
   if (state.outs >= OUTS_PER_INNING) {
     state.phase = 'INNING_OVER';
     addLog(`--- Inning over. Final score: ${state.score} ---`, true);
-    renderLog();
     updateButton();
+    stopPitchClock();
     return;
   }
 
   state.phase = 'AT_BAT_RESULT';
-  renderLog();
   updateButton();
 }
 
@@ -678,9 +754,9 @@ function updateButton() {
   const btn = $('action-btn');
   switch (state.phase) {
     case 'PRE_PITCH':
-      btn.textContent = 'Start Pitch';
-      btn.disabled = false;
-      btn.onclick = startPitch;
+      btn.textContent = 'Waiting...';
+      btn.disabled = true;
+      btn.onclick = null;
       break;
     case 'ANIMATING':
       btn.textContent = '...';
@@ -688,9 +764,9 @@ function updateButton() {
       btn.onclick = null;
       break;
     case 'BATTER_READY':
-      btn.textContent = 'Swing!';
-      btn.disabled = false;
-      btn.onclick = swingBat;
+      btn.textContent = '...';
+      btn.disabled = true;
+      btn.onclick = null;
       break;
     case 'CONTACT':
       btn.textContent = '...';
@@ -715,15 +791,6 @@ function updateButton() {
 
 function addLog(text, highlight) {
   state.gameLog.push({ text, highlight: !!highlight });
-  renderLog();
-}
-
-function renderLog() {
-  const entries = $('log-entries');
-  entries.innerHTML = state.gameLog.map(e =>
-    `<div class="log-entry${e.highlight ? ' log-highlight' : ''}">${e.text}</div>`
-  ).join('');
-  entries.parentElement.scrollTop = entries.parentElement.scrollHeight;
 }
 
 function renderSummary() {
@@ -737,29 +804,63 @@ function renderSummary() {
 function clearBattlefield() {
   $('pitcher-dice').innerHTML = '';
   $('batter-dice').innerHTML = '';
-  $('lane-0').innerHTML = '';
-  $('lane-1').innerHTML = '';
-  // Remove any flying dice
+  const lane0 = $('lane-0');
+  const lane1 = $('lane-1');
+  if (lane0) lane0.innerHTML = '';
+  if (lane1) lane1.innerHTML = '';
   document.querySelectorAll('.flying-die').forEach(el => el.remove());
 }
 
+// ============================================================
+// SECTION L: Pitch Clock
+// ============================================================
+
 function startPitchClock() {
-  const ring = $('clock-ring');
-  ring.style.transition = 'none';
-  ring.style.strokeDashoffset = '0';
-  ring.offsetWidth; // force reflow
-  ring.style.transition = 'stroke-dashoffset 2s linear';
-  ring.style.strokeDashoffset = '119.38';
+  stopPitchClock();
+  let secondsLeft = PITCH_CLOCK_SECONDS;
+  const timeEl = $('pitch-clock-time');
+  const display = $('pitch-clock-display');
+
+  timeEl.textContent = secondsLeft;
+  timeEl.classList.remove('urgent');
+  display.classList.remove('urgent');
+
+  pitchClockTimer = setInterval(() => {
+    secondsLeft--;
+    timeEl.textContent = secondsLeft;
+
+    if (secondsLeft <= 3) {
+      timeEl.classList.add('urgent');
+      display.classList.add('urgent');
+    }
+
+    if (secondsLeft <= 0) {
+      stopPitchClock();
+      // Auto-trigger pitch
+      if (state.phase === 'PRE_PITCH') {
+        startPitch();
+      }
+    }
+  }, 1000);
 }
 
-function resetPitchClock() {
-  const ring = $('clock-ring');
-  ring.style.transition = 'none';
-  ring.style.strokeDashoffset = '0';
+function stopPitchClock() {
+  if (pitchClockTimer) {
+    clearInterval(pitchClockTimer);
+    pitchClockTimer = null;
+  }
+  const timeEl = $('pitch-clock-time');
+  const display = $('pitch-clock-display');
+  if (timeEl) {
+    timeEl.classList.remove('urgent');
+  }
+  if (display) {
+    display.classList.remove('urgent');
+  }
 }
 
 // ============================================================
-// SECTION L: Game Flow
+// SECTION M: Game Flow
 // ============================================================
 
 function startInning() {
@@ -779,7 +880,6 @@ function startAtBat() {
 
   clearBattlefield();
   resetOutcomeBar();
-  resetPitchClock();
   updateBatterName();
   updateCount();
   updateScoreboard();
@@ -787,10 +887,13 @@ function startAtBat() {
   updateButton();
 
   addLog(`${currentBatter().name} steps up to bat.`);
+
+  // Start pitch clock
+  startPitchClock();
 }
 
 // ============================================================
-// SECTION M: Debug Overlay
+// SECTION N: Debug Overlay
 // ============================================================
 
 function showError(msg) {
@@ -819,7 +922,60 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 // ============================================================
-// SECTION N: Init
+// SECTION O: Debug Controls
+// ============================================================
+
+function setupDebugControls() {
+  // Test hit button
+  $('test-hit-btn').addEventListener('click', () => {
+    openContactModal();
+  });
+
+  // Pitcher dice slider
+  const pSlider = $('pitcher-dice-slider');
+  pSlider.addEventListener('input', () => {
+    PITCHER_DICE_COUNT = parseInt(pSlider.value);
+    $('pitcher-dice-count').textContent = pSlider.value;
+  });
+
+  // Batter dice slider
+  const bSlider = $('batter-dice-slider');
+  bSlider.addEventListener('input', () => {
+    BATTER_DICE_COUNT = parseInt(bSlider.value);
+    $('batter-dice-count').textContent = bSlider.value;
+  });
+
+  // Ball threshold
+  const ballSlider = $('ball-thresh');
+  ballSlider.addEventListener('input', () => {
+    THRESHOLDS.ball = parseInt(ballSlider.value);
+    $('ball-thresh-val').textContent = ballSlider.value;
+  });
+
+  // Hit threshold
+  const hitSlider = $('hit-thresh');
+  hitSlider.addEventListener('input', () => {
+    THRESHOLDS.hit = parseInt(hitSlider.value);
+    $('hit-thresh-val').textContent = hitSlider.value;
+  });
+
+  // Foul min
+  const foulSlider = $('foul-min');
+  foulSlider.addEventListener('input', () => {
+    THRESHOLDS.foulMin = parseInt(foulSlider.value);
+    $('foul-min-val').textContent = foulSlider.value;
+  });
+
+  // Strike threshold
+  const strikeSlider = $('strike-thresh');
+  strikeSlider.addEventListener('input', () => {
+    THRESHOLDS.strike = parseInt(strikeSlider.value);
+    $('strike-thresh-val').textContent = strikeSlider.value;
+  });
+}
+
+// ============================================================
+// SECTION P: Init
 // ============================================================
 
 function init() {
@@ -829,6 +985,7 @@ function init() {
       startInning();
     });
 
+    setupDebugControls();
     startInning();
   } catch (e) {
     showError('init: ' + e.message + ' @ ' + e.stack?.split('\n')[1]);

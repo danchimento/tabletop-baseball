@@ -91,21 +91,11 @@ html, body {
 .ball-on { color: var(--green); }
 .strike-on { color: var(--red); }
 
-/* === Battlefield === */
-#battlefield {
-  display: grid;
-  grid-template-columns: 90px 1fr 90px;
-  gap: 4px;
-  padding: 8px 0;
-  flex: 1;
-  align-content: start;
-}
-
-/* === Player Sides === */
-#pitcher-side, #batter-side {
+/* === Player Names Row === */
+#player-row {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px 2px;
 }
 
 .player-label {
@@ -114,15 +104,94 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--text-dim);
-  margin-bottom: 4px;
 }
 
-#pitcher-side .player-label { color: var(--red); }
-#batter-side .player-label { color: var(--green); }
+.pitcher-label { color: var(--red); }
+.batter-label { color: var(--green); }
 
-/* === Pitch Clock === */
-#pitch-clock {
-  margin: 4px 0 8px;
+/* === Outcome Bar (full width) === */
+#outcome-bar {
+  padding: 4px 0 6px;
+  position: relative;
+}
+
+#ob-track {
+  position: relative;
+  height: 26px;
+  border-radius: 13px;
+  background: linear-gradient(to right,
+    rgba(233,69,96,0.35) 0%,
+    rgba(233,69,96,0.2) 20%,
+    rgba(192,160,64,0.2) 20%,
+    rgba(192,160,64,0.15) 35%,
+    rgba(76,175,80,0.2) 35%,
+    rgba(76,175,80,0.2) 60%,
+    rgba(240,192,64,0.25) 60%,
+    rgba(240,192,64,0.3) 100%
+  );
+  border: 1px solid #444;
+  overflow: hidden;
+}
+
+#ob-zero-mark {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255,255,255,0.3);
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+#ob-indicator {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-10px);
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255,255,255,0.5);
+  transition: left 0.2s ease-in-out;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#ob-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 4px 0;
+}
+
+.ob-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ob-label-strike { color: var(--red); }
+.ob-label-foul { color: #c0a040; }
+.ob-label-ball { color: var(--green); }
+.ob-label-hit { color: var(--gold); }
+
+/* === Battlefield === */
+#battlefield {
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  gap: 4px;
+  padding: 4px 0;
+  align-content: start;
+}
+
+/* === Player Sides === */
+#pitcher-side, #batter-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 /* === Dice Columns === */
@@ -167,52 +236,13 @@ html, body {
   position: relative;
 }
 
-/* === Outcome Bar === */
-#outcome-bar {
-  display: flex;
-  height: 30px;
-  border-radius: 6px;
-  overflow: hidden;
-  position: relative;
-  border: 1px solid #444;
-}
-
-.ob-seg {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.ob-strike { background: rgba(233,69,96,0.2); color: var(--red); }
-.ob-foul { background: rgba(192,160,64,0.15); color: #c0a040; }
-.ob-ball { background: rgba(76,175,80,0.2); color: var(--green); }
-.ob-contact { background: rgba(240,192,64,0.2); color: var(--gold); }
-
-#ob-indicator {
-  position: absolute;
-  width: 25%;
-  height: 100%;
-  top: 0;
-  left: 25%; /* starts at Foul */
-  background: rgba(255,255,255,0.12);
-  border: 2px solid rgba(255,255,255,0.5);
-  border-radius: 5px;
-  transition: left 0.4s ease-in-out;
-  pointer-events: none;
-}
-
 /* === Battle Zone === */
 #battle-zone {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px 0;
-  min-height: 130px;
+  padding: 8px 0;
+  min-height: 120px;
 }
 
 .battle-lane {
@@ -224,7 +254,7 @@ html, body {
 .battle-die {
   position: absolute;
   top: 4px;
-  transition: left 0.5s ease-in-out, right 0.5s ease-in-out, opacity 0.3s, transform 0.5s;
+  transition: left 0.275s ease-in-out, right 0.275s ease-in-out, opacity 0.15s, transform 0.275s;
 }
 
 .die-loser {
@@ -240,7 +270,7 @@ html, body {
 .flying-die {
   position: absolute;
   z-index: 10;
-  transition: all 0.6s ease-in-out;
+  transition: all 0.3s ease-in-out;
   pointer-events: none;
 }
 
@@ -266,20 +296,103 @@ html, body {
 #action-btn:active:not(:disabled) { transform: scale(0.97); }
 #action-btn:disabled { background: #444; color: #888; cursor: default; }
 
-/* === Game Log === */
-#game-log {
-  max-height: 100px;
-  overflow-y: auto;
-  font-size: 12px;
-  color: var(--text-dim);
-  padding: 4px 0;
+/* === Debug Controls === */
+#debug-controls {
+  padding: 8px 0;
   border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-#log-entries { display: flex; flex-direction: column; gap: 1px; }
+#test-hit-btn {
+  width: 100%;
+  min-height: 40px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font);
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
 
-.log-entry { padding: 1px 0; }
-.log-highlight { color: var(--gold); font-weight: 600; }
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.slider-group label {
+  min-width: 140px;
+  font-size: 12px;
+}
+
+.slider-group input[type="range"] {
+  flex: 1;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+/* === Pitch Clock Overlay === */
+#pitch-clock-overlay {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 50;
+  pointer-events: none;
+}
+
+#pitch-clock-display {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid #333;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+#pitch-clock-display::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: #ff6600;
+  border-right-color: #ff6600;
+  transition: transform 15s linear;
+  transform: rotate(0deg);
+}
+
+#pitch-clock-display.counting::before {
+  transform: rotate(360deg);
+}
+
+#pitch-clock-display.urgent {
+  border-color: #ff4400;
+  box-shadow: 0 0 12px rgba(255,68,0,0.6);
+}
+
+#pitch-clock-time {
+  font-family: 'Courier New', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  color: #ff6600;
+  text-shadow: 0 0 6px rgba(255,102,0,0.5);
+  z-index: 1;
+}
+
+#pitch-clock-time.urgent {
+  color: #ff2200;
+  text-shadow: 0 0 8px rgba(255,34,0,0.8);
+}
 
 /* === Contact Modal === */
 #contact-modal {
@@ -292,10 +405,18 @@ html, body {
   z-index: 100;
 }
 
-#field-view {
-  position: relative;
+#contact-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   width: 94%;
   max-width: 400px;
+}
+
+#field-view {
+  position: relative;
+  width: 100%;
   aspect-ratio: 300 / 280;
 }
 
@@ -316,8 +437,51 @@ html, body {
 
 .field-die {
   position: absolute;
-  transition: all 0.8s ease-in-out;
+  transition: all 0.4s ease-in-out;
   z-index: 5;
+}
+
+/* Baseball for hit animation */
+.baseball {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff 0%, #eee 40%, #ccc 100%);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  z-index: 6;
+  transition: left 0.7s ease-out, top 0.7s ease-out, transform 0.7s ease-out;
+  pointer-events: none;
+}
+
+.baseball::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 1px solid rgba(200,0,0,0.4);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+/* X marker for caught balls */
+.catch-marker {
+  position: absolute;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--red);
+  text-shadow: 0 0 6px rgba(233,69,96,0.8);
+  z-index: 7;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  animation: pop-in 0.2s ease-out forwards;
+}
+
+@keyframes pop-in {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  70% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
 #contact-outcome {
@@ -331,7 +495,7 @@ html, body {
   text-shadow: 0 2px 8px rgba(0,0,0,0.8);
   z-index: 10;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.15s;
 }
 
 #contact-outcome.show { opacity: 1; }
@@ -341,10 +505,6 @@ html, body {
 #contact-outcome.outcome-hr { color: var(--gold); font-size: 36px; }
 
 #contact-roll-btn {
-  position: absolute;
-  bottom: 8%;
-  left: 50%;
-  transform: translateX(-50%);
   min-width: 120px;
   min-height: 44px;
   font-size: 18px;
@@ -413,17 +573,17 @@ html, body {
   cursor: pointer;
 }
 
-/* === Animations === */
+/* === Animations (all ~50% faster) === */
 @keyframes indicator-shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(3px); }
+  0%, 100% { transform: translateX(-10px); }
+  20% { transform: translateX(-14px); }
+  40% { transform: translateX(-6px); }
+  60% { transform: translateX(-13px); }
+  80% { transform: translateX(-7px); }
 }
 
 .ob-shake {
-  animation: indicator-shake 0.4s ease-in-out;
+  animation: indicator-shake 0.2s ease-in-out;
 }
 
 @keyframes impact-flash {
@@ -433,7 +593,7 @@ html, body {
 }
 
 .impact-flash {
-  animation: impact-flash 0.3s ease-out;
+  animation: impact-flash 0.15s ease-out;
 }
 
 @keyframes result-pop {
@@ -443,5 +603,5 @@ html, body {
 }
 
 .result-pop {
-  animation: result-pop 0.4s ease-out forwards;
+  animation: result-pop 0.2s ease-out forwards;
 }
