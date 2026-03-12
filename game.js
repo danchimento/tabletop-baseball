@@ -17,8 +17,8 @@ let BATTER_DICE_COUNT = 2;
 // Positive = batter side, negative = pitcher side
 let THRESHOLDS = {
   hit: 7,       // >= this is a hit
-  ball: 5,      // >= this and < hit is ball
-  foulMin: -2,  // >= this and < ball is foul
+  ball: 3,      // >= this and < hit is ball
+  foulMin: -3,  // >= this and < ball is foul
   strike: -3,   // < foulMin is strike (i.e. <= strike threshold)
 };
 
@@ -247,18 +247,7 @@ async function swingBat() {
   state.batterDice = await sortDice('batter', bVals);
   await delay(200);
 
-  // Fade out side dice
-  Array.from($('pitcher-dice').children).forEach(d => {
-    d.style.transition = 'opacity 0.15s';
-    d.style.opacity = '0.3';
-  });
-  Array.from($('batter-dice').children).forEach(d => {
-    d.style.transition = 'opacity 0.15s';
-    d.style.opacity = '0.3';
-  });
-  await delay(150);
-
-  // Run battle
+  // Run battle using actual dice on the board
   await runBattle();
   await delay(500);
 
@@ -291,58 +280,77 @@ async function runBattle() {
 }
 
 async function animateBattlePair(index, pVal, bVal, winner) {
-  const lane = $(`lane-${index}`);
-  if (!lane) return;
-  lane.innerHTML = '';
+  const pDice = Array.from($('pitcher-dice').children);
+  const bDice = Array.from($('batter-dice').children);
+  const pDie = pDice[index];
+  const bDie = bDice[index];
+  if (!pDie || !bDie) return;
 
-  const pDie = createDieElement('die-red');
-  pDie.classList.add('battle-die');
-  pDie.innerHTML = dieFaceHTML(pVal);
-  pDie.style.left = '-60px';
+  // Calculate how far each die needs to move to reach center collision point
+  const pRect = pDie.getBoundingClientRect();
+  const bRect = bDie.getBoundingClientRect();
+  const centerX = (pRect.right + bRect.left) / 2;
 
-  const bDie = createDieElement('die-green');
-  bDie.classList.add('battle-die');
-  bDie.innerHTML = dieFaceHTML(bVal);
-  bDie.style.left = `${lane.offsetWidth + 12}px`;
+  // Slide dice toward each other (leave a 4px gap between them)
+  const pOffset = centerX - pRect.right + 2;
+  const bOffset = centerX - bRect.left - 2;
 
-  lane.appendChild(pDie);
-  lane.appendChild(bDie);
-
-  await delay(30);
-
-  const center = lane.offsetWidth / 2;
-  pDie.style.left = `${center - 52}px`;
-  bDie.style.left = `${center + 4}px`;
+  pDie.style.transition = 'transform 0.275s ease-in-out';
+  bDie.style.transition = 'transform 0.275s ease-in-out';
+  pDie.style.transform = `translateX(${pOffset}px)`;
+  bDie.style.transform = `translateX(${bOffset}px)`;
+  pDie.style.opacity = '1';
+  bDie.style.opacity = '1';
 
   await delay(275);
 
-  lane.classList.add('impact-flash');
-  await delay(150);
-  lane.classList.remove('impact-flash');
+  // Impact flash
+  pDie.style.boxShadow = '0 0 12px rgba(255,255,255,0.6)';
+  bDie.style.boxShadow = '0 0 12px rgba(255,255,255,0.6)';
+  await delay(100);
+  pDie.style.boxShadow = '';
+  bDie.style.boxShadow = '';
+
+  // Resolve: loser fades, winner moves to center
+  const winCenterX = centerX - 24; // center a 48px die
 
   if (winner === 'batter') {
+    pDie.style.transition = 'transform 0.2s, opacity 0.2s';
     pDie.classList.add('die-loser');
-    await delay(200);
-    bDie.style.left = `${center - 24}px`;
+    await delay(100);
+    const bCenter = winCenterX - bRect.left;
+    bDie.style.transition = 'transform 0.2s ease-in-out';
+    bDie.style.transform = `translateX(${bCenter}px)`;
     bDie.classList.add('winner-die');
-    await delay(150);
-  } else if (winner === 'pitcher') {
-    bDie.classList.add('die-loser');
     await delay(200);
-    pDie.style.left = `${center - 24}px`;
-    pDie.classList.add('winner-die');
-    await delay(150);
-  } else {
-    pDie.classList.add('die-loser');
+  } else if (winner === 'pitcher') {
+    bDie.style.transition = 'transform 0.2s, opacity 0.2s';
     bDie.classList.add('die-loser');
     await delay(100);
+    const pCenter = winCenterX - pRect.left;
+    pDie.style.transition = 'transform 0.2s ease-in-out';
+    pDie.style.transform = `translateX(${pCenter}px)`;
+    pDie.classList.add('winner-die');
+    await delay(200);
+  } else {
+    // Tie: both fade out, gray die appears in center lane
+    pDie.style.transition = 'transform 0.2s, opacity 0.2s';
+    bDie.style.transition = 'transform 0.2s, opacity 0.2s';
+    pDie.classList.add('die-loser');
+    bDie.classList.add('die-loser');
+    await delay(150);
 
-    const grayDie = createDieElement('die-gray');
-    grayDie.classList.add('battle-die', 'winner-die');
-    grayDie.innerHTML = dieFaceHTML(pVal);
-    grayDie.style.left = `${center - 24}px`;
-    grayDie.dataset.value = pVal;
-    lane.appendChild(grayDie);
+    // Put gray die in the battle lane for fly-to-bar
+    const lane = $(`lane-${index}`);
+    if (lane) {
+      const grayDie = createDieElement('die-gray');
+      grayDie.classList.add('battle-die', 'winner-die');
+      grayDie.innerHTML = dieFaceHTML(pVal);
+      const laneCenter = lane.offsetWidth / 2 - 24;
+      grayDie.style.left = `${laneCenter}px`;
+      grayDie.dataset.value = pVal;
+      lane.appendChild(grayDie);
+    }
     await delay(150);
   }
 }
@@ -360,6 +368,15 @@ let indicatorValue = 0;
 function resetOutcomeBar() {
   indicatorValue = 0;
   updateIndicatorPosition(false);
+  updateObValue();
+}
+
+function updateObValue() {
+  const el = $('ob-value');
+  if (el) {
+    const v = Math.round(indicatorValue);
+    el.textContent = v > 0 ? '+' + v : v;
+  }
 }
 
 function updateOutcomeBarZones() {
@@ -423,6 +440,7 @@ function updateIndicatorPosition(animate) {
 async function moveIndicator(newValue) {
   indicatorValue = Math.max(BAR_MIN, Math.min(BAR_MAX, newValue));
   updateIndicatorPosition(true);
+  updateObValue();
   await delay(400);
 }
 
@@ -465,17 +483,29 @@ async function runOutcome() {
 }
 
 async function flyDieToBar(laneIndex, color, value) {
-  const lane = $(`lane-${laneIndex}`);
-  if (!lane) return;
   const centerCol = $('center-col');
   const bar = $('ob-track');
+  const barRect = bar.getBoundingClientRect();
+  const colRect = centerCol.getBoundingClientRect();
 
-  const winnerDie = lane.querySelector('.winner-die');
+  // Find winner die: first check side containers, then battle lanes
+  let winnerDie = null;
+  const pDice = Array.from($('pitcher-dice').children);
+  const bDice = Array.from($('batter-dice').children);
+
+  if (color === 'red' && pDice[laneIndex]?.classList.contains('winner-die')) {
+    winnerDie = pDice[laneIndex];
+  } else if (color === 'green' && bDice[laneIndex]?.classList.contains('winner-die')) {
+    winnerDie = bDice[laneIndex];
+  } else {
+    // Tie case: gray die in lane
+    const lane = $(`lane-${laneIndex}`);
+    if (lane) winnerDie = lane.querySelector('.winner-die');
+  }
+
   if (!winnerDie) return;
 
-  const colRect = centerCol.getBoundingClientRect();
   const dieRect = winnerDie.getBoundingClientRect();
-  const barRect = bar.getBoundingClientRect();
 
   const flyDie = createDieElement(`die-${color}`);
   flyDie.classList.add('flying-die');
@@ -503,11 +533,23 @@ async function flyDieToBar(laneIndex, color, value) {
 // SECTION H: Pitch Result
 // ============================================================
 
+function showPitchResultLabel(text, cssClass) {
+  const label = $('pitch-result-label');
+  label.textContent = text;
+  label.className = 'show ' + cssClass;
+  // Auto-hide after a delay
+  setTimeout(() => {
+    label.className = '';
+    label.textContent = '';
+  }, 1200);
+}
+
 async function processPitchResult(result) {
   if (result === 'strike') {
     state.count.strikes++;
     addLog('Strike!');
     updateCount();
+    showPitchResultLabel('Strike!', 'result-strike');
 
     if (state.count.strikes >= 3) {
       await delay(250);
@@ -518,10 +560,12 @@ async function processPitchResult(result) {
     state.count.strikes = Math.min(state.count.strikes + 1, 2);
     addLog('Foul Ball');
     updateCount();
+    showPitchResultLabel('Foul Ball', 'result-foul');
   } else if (result === 'ball') {
     state.count.balls++;
     addLog('Ball');
     updateCount();
+    showPitchResultLabel('Ball', 'result-ball');
 
     if (state.count.balls >= 4) {
       await delay(250);
@@ -530,6 +574,7 @@ async function processPitchResult(result) {
     }
   } else if (result === 'contact') {
     addLog('Contact!');
+    showPitchResultLabel('Contact!', 'result-contact');
     await delay(300);
     await openContactModal();
     return;
@@ -961,6 +1006,11 @@ function startAtBat() {
   updateDiamond();
   updateButton();
 
+  // Clear pitch result label
+  const label = $('pitch-result-label');
+  label.className = '';
+  label.textContent = '';
+
   addLog(`${currentBatter().name} steps up to bat.`);
 
   // Start pitch clock
@@ -1001,11 +1051,14 @@ window.addEventListener('unhandledrejection', function(e) {
 // ============================================================
 
 function setupDebugControls() {
-  // Debug toggle
-  $('debug-toggle').addEventListener('click', () => {
-    const controls = $('debug-controls');
-    controls.classList.toggle('collapsed');
-    $('debug-toggle').textContent = controls.classList.contains('collapsed') ? 'Debug ▸' : 'Debug ▾';
+  // FAB toggle
+  $('debug-fab').addEventListener('click', () => {
+    $('debug-panel').classList.toggle('hidden');
+  });
+
+  // Close button
+  $('debug-close').addEventListener('click', () => {
+    $('debug-panel').classList.add('hidden');
   });
 
   // Test hit button
