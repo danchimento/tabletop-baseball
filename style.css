@@ -160,8 +160,8 @@ html, body {
 }
 
 #ob-labels {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 14px;
   padding: 2px 4px 0;
 }
 
