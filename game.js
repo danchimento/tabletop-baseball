@@ -783,15 +783,9 @@ function updateButton() {
   const btn = $('action-btn');
   switch (state.phase) {
     case 'PRE_PITCH':
-      btn.textContent = 'Roll!';
-      btn.disabled = false;
-      btn.classList.remove('btn-urgent');
-      btn.onclick = () => {
-        if (state.phase === 'PRE_PITCH') {
-          btn.classList.remove('btn-urgent');
-          startPitch();
-        }
-      };
+      btn.textContent = 'Pitching...';
+      btn.disabled = true;
+      btn.onclick = null;
       break;
     case 'ANIMATING':
       btn.textContent = '...';
@@ -871,10 +865,9 @@ function startPitchClock() {
 
     if (secondsLeft <= 0) {
       stopPitchClock();
-      // Clock expired - highlight Roll button but don't auto-pitch
-      const btn = $('action-btn');
-      if (btn && state.phase === 'PRE_PITCH') {
-        btn.classList.add('btn-urgent');
+      // Auto-trigger pitch
+      if (state.phase === 'PRE_PITCH') {
+        startPitch();
       }
     }
   }, 1000);

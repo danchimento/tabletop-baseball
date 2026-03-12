@@ -295,14 +295,6 @@ html, body {
 
 #action-btn:active:not(:disabled) { transform: scale(0.97); }
 #action-btn:disabled { background: #444; color: #888; cursor: default; }
-#action-btn.btn-urgent {
-  animation: pulse-urgent 0.6s ease-in-out infinite alternate;
-  box-shadow: 0 0 16px var(--gold);
-}
-@keyframes pulse-urgent {
-  from { transform: scale(1); }
-  to { transform: scale(1.08); }
-}
 
 /* === Debug Controls === */
 #debug-controls {
