@@ -869,10 +869,9 @@ function startPitchClock() {
 
     if (secondsLeft <= 0) {
       stopPitchClock();
-      // Clock expired - highlight Roll button but don't auto-pitch
-      const btn = $('action-btn');
-      if (btn && state.phase === 'PRE_PITCH') {
-        btn.classList.add('btn-urgent');
+      // Auto-trigger pitch
+      if (state.phase === 'PRE_PITCH') {
+        startPitch();
       }
     }
   }, 1000);
