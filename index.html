@@ -74,7 +74,8 @@
     </div>
 
     <!-- Debug Controls -->
-    <div id="debug-controls">
+    <div id="debug-controls" class="collapsed">
+      <button id="debug-toggle">Debug ▸</button>
       <button id="test-hit-btn">Test Hit</button>
       <div class="slider-group">
         <label>Pitcher Dice: <span id="pitcher-dice-count">2</span></label>
@@ -121,13 +122,6 @@
             <!-- Infield dirt -->
             <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="#8B6914" opacity="0.5"/>
 
-            <!-- Zone overlays -->
-            <path d="M 150 260 L 107.6 217.6 A 60 60 0 0 1 192.4 217.6 Z" fill="rgba(233,69,96,0.25)"/>
-            <path d="M 107.6 217.6 A 60 60 0 0 1 192.4 217.6 L 217.2 192.8 A 95 95 0 0 0 82.8 192.8 Z" fill="rgba(76,175,80,0.25)"/>
-            <path d="M 82.8 192.8 A 95 95 0 0 1 217.2 192.8 L 245.5 164.5 A 135 135 0 0 0 54.5 164.5 Z" fill="rgba(233,69,96,0.25)"/>
-            <path d="M 54.5 164.5 A 135 135 0 0 1 245.5 164.5 L 266.7 143.3 A 165 165 0 0 0 33.3 143.3 Z" fill="rgba(76,175,80,0.25)"/>
-            <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3 L 284.4 125.6 A 190 190 0 0 0 15.6 125.6 Z" fill="rgba(76,175,80,0.3)"/>
-
             <!-- Fence -->
             <path d="M 33.3 143.3 A 165 165 0 0 1 266.7 143.3" fill="none" stroke="#654" stroke-width="3"/>
             <!-- Foul lines -->
@@ -140,19 +134,19 @@
             <rect x="147" y="197" width="6" height="6" fill="#fff" transform="rotate(45,150,200)"/>
             <rect x="117" y="227" width="6" height="6" fill="#fff" transform="rotate(45,120,230)"/>
 
-            <!-- Number markers -->
+            <!-- Number markers: red=out, green=hit, gold=HR -->
             <g font-size="11" font-weight="700" text-anchor="middle" fill="#fff">
-              <circle cx="128" cy="232" r="11" fill="rgba(0,0,0,0.5)"/><text x="128" y="236">2</text>
-              <circle cx="153" cy="222" r="11" fill="rgba(0,0,0,0.5)"/><text x="153" y="226">3</text>
-              <circle cx="175" cy="235" r="11" fill="rgba(0,0,0,0.5)"/><text x="175" y="239">4</text>
-              <circle cx="82" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="82" y="176">5</text>
-              <circle cx="150" cy="150" r="11" fill="rgba(0,0,0,0.5)"/><text x="150" y="154">6</text>
-              <circle cx="218" cy="172" r="11" fill="rgba(0,0,0,0.5)"/><text x="218" y="176">7</text>
-              <circle cx="108" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="108" y="202">8</text>
-              <circle cx="192" cy="198" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="192" y="202">9</text>
-              <circle cx="52" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="52" y="152">10</text>
-              <circle cx="248" cy="148" r="11" fill="rgba(76,175,80,0.6)" stroke="#fff" stroke-width="1"/><text x="248" y="152">11</text>
-              <circle cx="150" cy="85" r="13" fill="rgba(240,192,64,0.8)" stroke="#fff" stroke-width="1.5"/><text x="150" y="89" fill="#000">12</text>
+              <circle cx="130" cy="230" r="12" fill="rgba(233,69,96,0.7)" stroke="rgba(233,69,96,0.9)" stroke-width="1.5"/><text x="130" y="234">2</text>
+              <circle cx="150" cy="218" r="12" fill="rgba(233,69,96,0.7)" stroke="rgba(233,69,96,0.9)" stroke-width="1.5"/><text x="150" y="222">3</text>
+              <circle cx="170" cy="230" r="12" fill="rgba(233,69,96,0.7)" stroke="rgba(233,69,96,0.9)" stroke-width="1.5"/><text x="170" y="234">4</text>
+              <circle cx="85" cy="178" r="12" fill="rgba(233,69,96,0.7)" stroke="rgba(233,69,96,0.9)" stroke-width="1.5"/><text x="85" y="182">5</text>
+              <circle cx="150" cy="158" r="12" fill="rgba(233,69,96,0.7)" stroke="rgba(233,69,96,0.9)" stroke-width="1.5"/><text x="150" y="162">6</text>
+              <circle cx="215" cy="178" r="12" fill="rgba(233,69,96,0.7)" stroke="rgba(233,69,96,0.9)" stroke-width="1.5"/><text x="215" y="182">7</text>
+              <circle cx="110" cy="200" r="12" fill="rgba(76,175,80,0.7)" stroke="rgba(76,175,80,0.9)" stroke-width="1.5"/><text x="110" y="204">8</text>
+              <circle cx="190" cy="200" r="12" fill="rgba(76,175,80,0.7)" stroke="rgba(76,175,80,0.9)" stroke-width="1.5"/><text x="190" y="204">9</text>
+              <circle cx="58" cy="155" r="12" fill="rgba(76,175,80,0.7)" stroke="rgba(76,175,80,0.9)" stroke-width="1.5"/><text x="58" y="159">10</text>
+              <circle cx="242" cy="155" r="12" fill="rgba(76,175,80,0.7)" stroke="rgba(76,175,80,0.9)" stroke-width="1.5"/><text x="242" y="159">11</text>
+              <circle cx="150" cy="95" r="14" fill="rgba(240,192,64,0.85)" stroke="rgba(240,192,64,1)" stroke-width="2"/><text x="150" y="99" fill="#000">12</text>
             </g>
           </svg>
           <div id="field-overlay"></div>

@@ -46,17 +46,17 @@ const CONTACT_MAP = {
 };
 
 const FIELD_POSITIONS = {
-  2:  { x: 42.7, y: 82.9 },
-  3:  { x: 51.0, y: 79.3 },
-  4:  { x: 58.3, y: 83.9 },
-  5:  { x: 27.3, y: 61.4 },
-  6:  { x: 50.0, y: 53.6 },
-  7:  { x: 72.7, y: 61.4 },
-  8:  { x: 36.0, y: 70.7 },
-  9:  { x: 64.0, y: 70.7 },
-  10: { x: 17.3, y: 52.9 },
-  11: { x: 82.7, y: 52.9 },
-  12: { x: 50.0, y: 30.4 },
+  2:  { x: 43.3, y: 82.1 },
+  3:  { x: 50.0, y: 77.9 },
+  4:  { x: 56.7, y: 82.1 },
+  5:  { x: 28.3, y: 63.6 },
+  6:  { x: 50.0, y: 56.4 },
+  7:  { x: 71.7, y: 63.6 },
+  8:  { x: 36.7, y: 71.4 },
+  9:  { x: 63.3, y: 71.4 },
+  10: { x: 19.3, y: 55.4 },
+  11: { x: 80.7, y: 55.4 },
+  12: { x: 50.0, y: 33.9 },
 };
 
 // ~50% faster spin
@@ -1001,6 +1001,13 @@ window.addEventListener('unhandledrejection', function(e) {
 // ============================================================
 
 function setupDebugControls() {
+  // Debug toggle
+  $('debug-toggle').addEventListener('click', () => {
+    const controls = $('debug-controls');
+    controls.classList.toggle('collapsed');
+    $('debug-toggle').textContent = controls.classList.contains('collapsed') ? 'Debug ▸' : 'Debug ▾';
+  });
+
   // Test hit button
   $('test-hit-btn').addEventListener('click', () => {
     openContactModal();
