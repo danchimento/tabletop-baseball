@@ -270,7 +270,7 @@ html, body {
 .flying-die {
   position: absolute;
   z-index: 10;
-  transition: all 0.3s ease-in-out;
+  transition: all 0.45s ease-in-out;
   pointer-events: none;
 }
 
@@ -435,10 +435,15 @@ html, body {
   pointer-events: none;
 }
 
+.contact-dice-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  transition: opacity 0.15s;
+}
+
 .field-die {
-  position: absolute;
-  transition: all 0.4s ease-in-out;
-  z-index: 5;
+  flex-shrink: 0;
 }
 
 /* Baseball for hit animation */
@@ -450,7 +455,7 @@ html, body {
   background: radial-gradient(circle at 35% 35%, #fff 0%, #eee 40%, #ccc 100%);
   box-shadow: 0 1px 4px rgba(0,0,0,0.5);
   z-index: 6;
-  transition: left 0.7s ease-out, top 0.7s ease-out, transform 0.7s ease-out;
+  transition: left 0.8s ease-out, top 0.8s ease-out, transform 0.8s ease-out;
   pointer-events: none;
 }
 

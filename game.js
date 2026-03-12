@@ -63,7 +63,7 @@ const FIELD_POSITIONS = {
 const SPIN_INTERVALS = [25,25,25,30,30,35,40,45,55,70,90,120,160];
 
 const OUTS_PER_INNING = 3;
-const PITCH_CLOCK_SECONDS = 8;
+const PITCH_CLOCK_SECONDS = 3;
 
 // ============================================================
 // SECTION B: State
@@ -139,27 +139,53 @@ function spinDie(element, finalValue) {
 
 async function sortDice(side, values) {
   const sorted = [...values].sort((a, b) => b - a);
-  if (sorted[0] === values[0]) return sorted;
+
+  // Check if already sorted
+  const alreadySorted = values.every((v, i) => v === sorted[i]);
+  if (alreadySorted) return sorted;
 
   const container = $(`${side}-dice`);
   const dice = Array.from(container.children);
   if (dice.length < 2) return sorted;
 
+  // Build a map: for each target position, find which current die goes there
+  // Match by value, handling duplicates
+  const usedIndices = new Set();
+  const targetOrder = sorted.map(targetVal => {
+    for (let i = 0; i < values.length; i++) {
+      if (!usedIndices.has(i) && values[i] === targetVal) {
+        usedIndices.add(i);
+        return i;
+      }
+    }
+    return 0;
+  });
+
+  // If order hasn't changed, skip
+  const needsSwap = targetOrder.some((fromIdx, toIdx) => fromIdx !== toIdx);
+  if (!needsSwap) return sorted;
+
   const h = dice[0].offsetHeight + 8;
 
-  // Animate swap for each pair that needs reordering
-  dice[0].style.transition = 'transform 0.2s ease-in-out';
-  dice[1].style.transition = 'transform 0.2s ease-in-out';
-  dice[0].style.transform = `translateY(${h}px)`;
-  dice[1].style.transform = `translateY(-${h}px)`;
+  // Animate each die to its target position
+  targetOrder.forEach((fromIdx, toIdx) => {
+    const offset = (toIdx - fromIdx) * h;
+    dice[fromIdx].style.transition = 'transform 0.3s ease-in-out';
+    dice[fromIdx].style.transform = `translateY(${offset}px)`;
+  });
 
-  await delay(220);
+  await delay(320);
 
-  container.insertBefore(dice[1], dice[0]);
-  dice[0].style.transition = 'none';
-  dice[1].style.transition = 'none';
-  dice[0].style.transform = '';
-  dice[1].style.transform = '';
+  // Reorder DOM to match sorted order
+  targetOrder.forEach(fromIdx => {
+    container.appendChild(dice[fromIdx]);
+  });
+
+  // Clear transforms
+  dice.forEach(d => {
+    d.style.transition = 'none';
+    d.style.transform = '';
+  });
 
   return sorted;
 }
@@ -234,7 +260,7 @@ async function swingBat() {
 
   // Run battle
   await runBattle();
-  await delay(200);
+  await delay(500);
 
   // Run outcome
   await runOutcome();
@@ -260,7 +286,7 @@ async function runBattle() {
     state.battleResults.push({ pVal, bVal, winner, color, winValue });
 
     await animateBattlePair(i, pVal, bVal, winner);
-    await delay(150);
+    await delay(400);
   }
 }
 
@@ -349,7 +375,7 @@ function updateIndicatorPosition(animate) {
     indicator.style.transition = 'none';
     indicator.offsetWidth;
   } else {
-    indicator.style.transition = 'left 0.2s ease-in-out';
+    indicator.style.transition = 'left 0.35s ease-in-out';
   }
   indicator.style.left = valueToPercent(indicatorValue) + '%';
   indicator.classList.remove('ob-shake');
@@ -358,7 +384,7 @@ function updateIndicatorPosition(animate) {
 async function moveIndicator(newValue) {
   indicatorValue = Math.max(BAR_MIN, Math.min(BAR_MAX, newValue));
   updateIndicatorPosition(true);
-  await delay(225);
+  await delay(400);
 }
 
 async function shakeIndicator() {
@@ -391,7 +417,7 @@ async function runOutcome() {
     } else {
       await shakeIndicator();
     }
-    await delay(100);
+    await delay(300);
   }
 
   const pitchResult = determineOutcome(indicatorValue);
@@ -430,7 +456,7 @@ async function flyDieToBar(laneIndex, color, value) {
   flyDie.style.transform = 'scale(0.3)';
   flyDie.style.opacity = '0';
 
-  await delay(325);
+  await delay(500);
   flyDie.remove();
 }
 
@@ -511,31 +537,31 @@ async function rollContactDice() {
   const isOutfield = sum >= 5 && sum <= 7 || sum >= 10;
   const isHomeRun = result.outcome === 'home_run';
 
-  // Create dice near home plate
+  // Create dice below the field (in contact-wrapper, not field-overlay)
+  const wrapper = $('contact-wrapper');
+  const diceRow = document.createElement('div');
+  diceRow.className = 'contact-dice-row';
+
   const die1 = createDieElement('die-green');
   die1.classList.add('field-die');
-  die1.style.left = 'calc(46% - 24px)';
-  die1.style.top = '85%';
-  overlay.appendChild(die1);
+  diceRow.appendChild(die1);
 
   const die2 = createDieElement('die-green');
   die2.classList.add('field-die');
-  die2.style.left = 'calc(54%)';
-  die2.style.top = '85%';
-  overlay.appendChild(die2);
+  diceRow.appendChild(die2);
+
+  // Insert dice row between field and roll button
+  wrapper.insertBefore(diceRow, $('contact-roll-btn'));
 
   // Spin
   await Promise.all([spinDie(die1, d1), spinDie(die2, d2)]);
   await delay(300);
 
   // Hide dice, show baseball animation
-  die1.style.transition = 'opacity 0.15s';
-  die2.style.transition = 'opacity 0.15s';
-  die1.style.opacity = '0';
-  die2.style.opacity = '0';
+  diceRow.style.transition = 'opacity 0.15s';
+  diceRow.style.opacity = '0';
   await delay(150);
-  die1.remove();
-  die2.remove();
+  diceRow.remove();
 
   // Create baseball at home plate
   const ball = document.createElement('div');
@@ -550,27 +576,28 @@ async function rollContactDice() {
   // Fly baseball to target position
   if (isOutfield || isHomeRun) {
     // Outfield: ball "flies" - gets bigger then smaller
-    ball.style.transition = 'left 0.35s ease-out, top 0.35s ease-out';
     // First half: ball goes up and grows
     const midX = (48 + pos.x) / 2;
     const midY = (90 + pos.y) / 2 - 10;
     ball.style.left = midX + '%';
     ball.style.top = midY + '%';
-    ball.style.transition = 'left 0.35s ease-out, top 0.35s ease-out, transform 0.35s ease-out';
+    ball.style.transition = 'left 0.6s ease-out, top 0.6s ease-out, transform 0.6s ease-out';
     ball.style.transform = 'scale(2.5)';
-    await delay(350);
+    await delay(600);
 
     // Second half: ball descends and shrinks
+    ball.style.transition = 'left 0.7s ease-in, top 0.7s ease-in, transform 0.7s ease-in';
     ball.style.left = pos.x + '%';
     ball.style.top = pos.y + '%';
     ball.style.transform = 'scale(0.8)';
-    await delay(350);
+    await delay(700);
   } else {
     // Infield: ground ball, direct path
+    ball.style.transition = 'left 0.8s ease-out, top 0.8s ease-out, transform 0.8s ease-out';
     ball.style.left = pos.x + '%';
     ball.style.top = pos.y + '%';
     ball.style.transform = 'scale(0.9)';
-    await delay(500);
+    await delay(800);
   }
 
   // If out, replace with X
@@ -754,9 +781,13 @@ function updateButton() {
   const btn = $('action-btn');
   switch (state.phase) {
     case 'PRE_PITCH':
-      btn.textContent = 'Waiting...';
-      btn.disabled = true;
-      btn.onclick = null;
+      btn.textContent = 'Roll!';
+      btn.disabled = false;
+      btn.onclick = () => {
+        if (state.phase === 'PRE_PITCH') {
+          startPitch();
+        }
+      };
       break;
     case 'ANIMATING':
       btn.textContent = '...';
