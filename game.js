@@ -220,9 +220,9 @@ async function startPitch() {
   state.pitcherDice = await sortDice('pitcher', pVals);
   await delay(150);
 
-  // Auto-proceed to batter swing
+  // Wait for player to press Roll for batter dice
   state.phase = 'BATTER_READY';
-  await swingBat();
+  updateButton();
 }
 
 async function swingBat() {
@@ -555,12 +555,14 @@ async function rollContactDice() {
 
   // Spin
   await Promise.all([spinDie(die1, d1), spinDie(die2, d2)]);
-  await delay(300);
 
-  // Hide dice, show baseball animation
-  diceRow.style.transition = 'opacity 0.15s';
+  // Show dice result for 1 second before ball animation
+  await delay(1000);
+
+  // Fade out dice
+  diceRow.style.transition = 'opacity 0.3s';
   diceRow.style.opacity = '0';
-  await delay(150);
+  await delay(300);
   diceRow.remove();
 
   // Create baseball at home plate
@@ -781,13 +783,9 @@ function updateButton() {
   const btn = $('action-btn');
   switch (state.phase) {
     case 'PRE_PITCH':
-      btn.textContent = 'Roll!';
-      btn.disabled = false;
-      btn.onclick = () => {
-        if (state.phase === 'PRE_PITCH') {
-          startPitch();
-        }
-      };
+      btn.textContent = 'Pitching...';
+      btn.disabled = true;
+      btn.onclick = null;
       break;
     case 'ANIMATING':
       btn.textContent = '...';
@@ -795,9 +793,13 @@ function updateButton() {
       btn.onclick = null;
       break;
     case 'BATTER_READY':
-      btn.textContent = '...';
-      btn.disabled = true;
-      btn.onclick = null;
+      btn.textContent = 'Roll!';
+      btn.disabled = false;
+      btn.onclick = () => {
+        if (state.phase === 'BATTER_READY') {
+          swingBat();
+        }
+      };
       break;
     case 'CONTACT':
       btn.textContent = '...';
