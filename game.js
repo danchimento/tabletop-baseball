@@ -362,6 +362,45 @@ function resetOutcomeBar() {
   updateIndicatorPosition(false);
 }
 
+function updateOutcomeBarZones() {
+  // Convert threshold values to percentages on the bar
+  const toP = v => valueToPercent(v);
+  const strikeEnd = toP(THRESHOLDS.foulMin);
+  const foulEnd = toP(THRESHOLDS.ball);
+  const ballEnd = toP(THRESHOLDS.hit);
+
+  $('ob-track').style.background = `linear-gradient(to right,
+    rgba(233,69,96,0.35) 0%,
+    rgba(233,69,96,0.2) ${strikeEnd}%,
+    rgba(192,160,64,0.2) ${strikeEnd}%,
+    rgba(192,160,64,0.15) ${foulEnd}%,
+    rgba(76,175,80,0.2) ${foulEnd}%,
+    rgba(76,175,80,0.2) ${ballEnd}%,
+    rgba(240,192,64,0.25) ${ballEnd}%,
+    rgba(240,192,64,0.3) 100%
+  )`;
+
+  // Position labels at the center of each zone
+  const labels = $('ob-labels');
+  const strikeLabel = labels.querySelector('.ob-label-strike');
+  const foulLabel = labels.querySelector('.ob-label-foul');
+  const ballLabel = labels.querySelector('.ob-label-ball');
+  const hitLabel = labels.querySelector('.ob-label-hit');
+
+  labels.style.position = 'relative';
+  labels.style.display = 'block';
+
+  [strikeLabel, foulLabel, ballLabel, hitLabel].forEach(l => {
+    l.style.position = 'absolute';
+    l.style.transform = 'translateX(-50%)';
+  });
+
+  strikeLabel.style.left = (strikeEnd / 2) + '%';
+  foulLabel.style.left = ((strikeEnd + foulEnd) / 2) + '%';
+  ballLabel.style.left = ((foulEnd + ballEnd) / 2) + '%';
+  hitLabel.style.left = ((ballEnd + 100) / 2) + '%';
+}
+
 function valueToPercent(val) {
   // Clamp value to range
   const clamped = Math.max(BAR_MIN, Math.min(BAR_MAX, val));
@@ -496,8 +535,9 @@ async function processPitchResult(result) {
     return;
   }
 
-  // Continue at-bat: start pitch clock for auto-pitch
+  // Continue at-bat: reset bar and start pitch clock for auto-pitch
   await delay(400);
+  resetOutcomeBar();
   clearBattlefield();
   state.phase = 'PRE_PITCH';
   updateButton();
@@ -518,6 +558,8 @@ async function openContactModal() {
   $('field-overlay').innerHTML = '';
   $('contact-outcome').textContent = '';
   $('contact-outcome').className = '';
+  // Clean up any leftover dice rows from previous contact
+  $('contact-wrapper').querySelectorAll('.contact-dice-row').forEach(r => r.remove());
 
   const rollBtn = $('contact-roll-btn');
   rollBtn.classList.remove('hidden');
@@ -559,11 +601,11 @@ async function rollContactDice() {
   // Show dice result for 1 second before ball animation
   await delay(1000);
 
-  // Fade out dice
+  // Fade out dice (keep space reserved to prevent layout shift)
   diceRow.style.transition = 'opacity 0.3s';
   diceRow.style.opacity = '0';
   await delay(300);
-  diceRow.remove();
+  diceRow.style.visibility = 'hidden';
 
   // Create baseball at home plate
   const ball = document.createElement('div');
@@ -983,6 +1025,7 @@ function setupDebugControls() {
   ballSlider.addEventListener('input', () => {
     THRESHOLDS.ball = parseInt(ballSlider.value);
     $('ball-thresh-val').textContent = ballSlider.value;
+    updateOutcomeBarZones();
   });
 
   // Hit threshold
@@ -990,6 +1033,7 @@ function setupDebugControls() {
   hitSlider.addEventListener('input', () => {
     THRESHOLDS.hit = parseInt(hitSlider.value);
     $('hit-thresh-val').textContent = hitSlider.value;
+    updateOutcomeBarZones();
   });
 
   // Foul min
@@ -997,6 +1041,7 @@ function setupDebugControls() {
   foulSlider.addEventListener('input', () => {
     THRESHOLDS.foulMin = parseInt(foulSlider.value);
     $('foul-min-val').textContent = foulSlider.value;
+    updateOutcomeBarZones();
   });
 
   // Strike threshold
@@ -1004,6 +1049,7 @@ function setupDebugControls() {
   strikeSlider.addEventListener('input', () => {
     THRESHOLDS.strike = parseInt(strikeSlider.value);
     $('strike-thresh-val').textContent = strikeSlider.value;
+    updateOutcomeBarZones();
   });
 }
 
@@ -1019,6 +1065,7 @@ function init() {
     });
 
     setupDebugControls();
+    updateOutcomeBarZones();
     startInning();
   } catch (e) {
     showError('init: ' + e.message + ' @ ' + e.stack?.split('\n')[1]);
