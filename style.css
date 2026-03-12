@@ -183,6 +183,7 @@ html, body {
   grid-template-columns: 90px 1fr 90px;
   gap: 4px;
   padding: 4px 0;
+  flex: 1;
   align-content: start;
 }
 
@@ -277,6 +278,7 @@ html, body {
 /* === Action Button === */
 #action-area {
   padding: 8px 0;
+  margin-top: auto;
 }
 
 #action-btn {
@@ -303,6 +305,25 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+#debug-controls.collapsed > *:not(#debug-toggle) {
+  display: none;
+}
+
+#debug-toggle {
+  width: 100%;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  background: #333;
+  color: var(--text-dim);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 #test-hit-btn {
@@ -347,51 +368,38 @@ html, body {
 }
 
 #pitch-clock-display {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 3px solid #333;
-  background: #111;
+  width: 52px;
+  height: 52px;
+  border-radius: 4px;
+  border: 2px solid #444;
+  background: #0a0a0a;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
-}
-
-#pitch-clock-display::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  border-top-color: #ff6600;
-  border-right-color: #ff6600;
-  transition: transform 15s linear;
-  transform: rotate(0deg);
-}
-
-#pitch-clock-display.counting::before {
-  transform: rotate(360deg);
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.5);
 }
 
 #pitch-clock-display.urgent {
   border-color: #ff4400;
-  box-shadow: 0 0 12px rgba(255,68,0,0.6);
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.8), 0 0 12px rgba(255,68,0,0.6);
 }
 
 #pitch-clock-time {
   font-family: 'Courier New', monospace;
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
   color: #ff6600;
-  text-shadow: 0 0 6px rgba(255,102,0,0.5);
+  text-shadow: 0 0 10px rgba(255,102,0,0.6), 0 0 20px rgba(255,102,0,0.3);
   z-index: 1;
+  /* 7-segment display effect */
+  letter-spacing: 2px;
+  -webkit-font-smoothing: none;
 }
 
 #pitch-clock-time.urgent {
   color: #ff2200;
-  text-shadow: 0 0 8px rgba(255,34,0,0.8);
+  text-shadow: 0 0 10px rgba(255,34,0,0.8), 0 0 20px rgba(255,34,0,0.4);
 }
 
 /* === Contact Modal === */
