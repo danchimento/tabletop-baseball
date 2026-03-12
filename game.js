@@ -220,9 +220,9 @@ async function startPitch() {
   state.pitcherDice = await sortDice('pitcher', pVals);
   await delay(150);
 
-  // Auto-proceed to batter swing
+  // Wait for player to press Roll for batter dice
   state.phase = 'BATTER_READY';
-  await swingBat();
+  updateButton();
 }
 
 async function swingBat() {
@@ -793,9 +793,13 @@ function updateButton() {
       btn.onclick = null;
       break;
     case 'BATTER_READY':
-      btn.textContent = '...';
-      btn.disabled = true;
-      btn.onclick = null;
+      btn.textContent = 'Roll!';
+      btn.disabled = false;
+      btn.onclick = () => {
+        if (state.phase === 'BATTER_READY') {
+          swingBat();
+        }
+      };
       break;
     case 'CONTACT':
       btn.textContent = '...';
