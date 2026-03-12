@@ -555,12 +555,14 @@ async function rollContactDice() {
 
   // Spin
   await Promise.all([spinDie(die1, d1), spinDie(die2, d2)]);
-  await delay(300);
 
-  // Hide dice, show baseball animation
-  diceRow.style.transition = 'opacity 0.15s';
+  // Show dice result for 1 second before ball animation
+  await delay(1000);
+
+  // Fade out dice
+  diceRow.style.transition = 'opacity 0.3s';
   diceRow.style.opacity = '0';
-  await delay(150);
+  await delay(300);
   diceRow.remove();
 
   // Create baseball at home plate
@@ -783,8 +785,10 @@ function updateButton() {
     case 'PRE_PITCH':
       btn.textContent = 'Roll!';
       btn.disabled = false;
+      btn.classList.remove('btn-urgent');
       btn.onclick = () => {
         if (state.phase === 'PRE_PITCH') {
+          btn.classList.remove('btn-urgent');
           startPitch();
         }
       };
@@ -867,9 +871,10 @@ function startPitchClock() {
 
     if (secondsLeft <= 0) {
       stopPitchClock();
-      // Auto-trigger pitch
-      if (state.phase === 'PRE_PITCH') {
-        startPitch();
+      // Clock expired - highlight Roll button but don't auto-pitch
+      const btn = $('action-btn');
+      if (btn && state.phase === 'PRE_PITCH') {
+        btn.classList.add('btn-urgent');
       }
     }
   }, 1000);
