@@ -5,73 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Dice Baseball</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <div id="app">
-    <!-- Top Bar -->
-    <div id="top-bar">
-      <div id="scoreboard">
-        <span id="score-display">Score: 0</span>
-        <span id="inning-display">Top 1st</span>
-        <span id="outs-display">Outs: <span class="out-dots"></span></span>
+    <!-- Sprite Animation Scene (top 30%) -->
+    <div id="sprite-scene"></div>
+
+    <!-- Game Board (middle ~50%) -->
+    <div id="game-board">
+      <!-- Player Names Row -->
+      <div id="player-row">
+        <div class="player-label pitcher-label">Pitcher</div>
+        <div class="player-label batter-label" id="batter-name">Batter</div>
       </div>
-      <div id="status-row">
-        <svg id="mini-diamond" viewBox="0 0 50 50" width="36" height="36">
-          <polygon points="25,5 45,25 25,45 5,25" fill="none" stroke="#8B6914" stroke-width="1.5"/>
-          <circle id="base-1" cx="45" cy="25" r="4" fill="#2a2a2a" stroke="#8B6914" stroke-width="1.5"/>
-          <circle id="base-2" cx="25" cy="5" r="4" fill="#2a2a2a" stroke="#8B6914" stroke-width="1.5"/>
-          <circle id="base-3" cx="5" cy="25" r="4" fill="#2a2a2a" stroke="#8B6914" stroke-width="1.5"/>
-        </svg>
-        <div id="count">
-          <div class="count-row"><span class="count-label">B</span><span id="balls-dots" class="count-dots"></span></div>
-          <div class="count-row"><span class="count-label">S</span><span id="strikes-dots" class="count-dots"></span></div>
+
+      <!-- Outcome Bar (full width, below names) -->
+      <div id="outcome-bar">
+        <div id="pitch-result-label"></div>
+        <div id="ob-track">
+          <div id="ob-indicator"><span id="ob-value">0</span></div>
+          <div id="ob-zero-mark"></div>
         </div>
-      </div>
-    </div>
-
-    <!-- Player Names Row -->
-    <div id="player-row">
-      <div class="player-label pitcher-label">Pitcher</div>
-      <div class="player-label batter-label" id="batter-name">Batter</div>
-    </div>
-
-    <!-- Outcome Bar (full width, below names) -->
-    <div id="outcome-bar">
-      <div id="pitch-result-label"></div>
-      <div id="ob-track">
-        <div id="ob-indicator"><span id="ob-value">0</span></div>
-        <div id="ob-zero-mark"></div>
-      </div>
-      <div id="ob-labels">
-        <span class="ob-label ob-label-strike">K</span>
-        <span class="ob-label ob-label-foul">Foul</span>
-        <span class="ob-label ob-label-ball">Ball</span>
-        <span class="ob-label ob-label-hit">Hit!</span>
-      </div>
-    </div>
-
-    <!-- Battlefield -->
-    <div id="battlefield">
-      <div id="pitcher-side">
-        <div id="pitcher-dice" class="dice-col"></div>
-      </div>
-
-      <div id="center-col">
-        <div id="battle-zone">
-          <div class="battle-lane" id="lane-0"></div>
-          <div class="battle-lane" id="lane-1"></div>
+        <div id="ob-labels">
+          <span class="ob-label ob-label-strike">K</span>
+          <span class="ob-label ob-label-foul">Foul</span>
+          <span class="ob-label ob-label-ball">Ball</span>
+          <span class="ob-label ob-label-hit">Hit!</span>
         </div>
       </div>
 
-      <div id="batter-side">
-        <div id="batter-dice" class="dice-col"></div>
+      <!-- Battlefield -->
+      <div id="battlefield">
+        <div id="pitcher-side">
+          <div id="pitcher-dice" class="dice-col"></div>
+        </div>
+
+        <div id="center-col">
+          <div id="battle-zone">
+            <div class="battle-lane" id="lane-0"></div>
+            <div class="battle-lane" id="lane-1"></div>
+          </div>
+        </div>
+
+        <div id="batter-side">
+          <div id="batter-dice" class="dice-col"></div>
+          <div id="tap-prompt" class="hidden">Tap to Swing</div>
+        </div>
+      </div>
+
+      <!-- Result Overlay -->
+      <div id="result-overlay" class="hidden">
+        <span id="result-overlay-text"></span>
       </div>
     </div>
 
-    <!-- Action Button -->
-    <div id="action-area">
-      <button id="action-btn" disabled>Loading...</button>
+    <!-- TV-Style Status Bar (bottom ~20%) -->
+    <div id="tv-bar">
+      <svg id="tv-diamond" viewBox="0 0 40 40" width="32" height="32">
+        <polygon points="20,4 36,20 20,36 4,20" fill="none" stroke="#8B6914" stroke-width="1.5"/>
+        <circle id="tv-base-1" cx="36" cy="20" r="3.5" fill="#2a2a2a" stroke="#8B6914" stroke-width="1"/>
+        <circle id="tv-base-2" cx="20" cy="4" r="3.5" fill="#2a2a2a" stroke="#8B6914" stroke-width="1"/>
+        <circle id="tv-base-3" cx="4" cy="20" r="3.5" fill="#2a2a2a" stroke="#8B6914" stroke-width="1"/>
+      </svg>
+      <div id="tv-outs">0 Outs</div>
+      <div class="tv-sep">|</div>
+      <div id="tv-inning">Top 1</div>
+      <div class="tv-sep">|</div>
+      <div id="tv-score">0</div>
+      <div class="tv-sep">|</div>
+      <div id="tv-count">
+        <span id="tv-balls">B: 0</span>
+        <span id="tv-strikes">S: 0</span>
+      </div>
     </div>
   </div>
 
@@ -154,8 +160,8 @@
           </svg>
           <div id="field-overlay"></div>
           <div id="contact-outcome"></div>
+          <div id="contact-tap-prompt" class="hidden">Tap to Roll</div>
         </div>
-        <button id="contact-roll-btn" class="hidden">Roll!</button>
       </div>
     </div>
 
@@ -168,11 +174,14 @@
         <button id="replay-btn">Play Again</button>
       </div>
     </div>
-  </div>
 
-  <script src="config.js?v=7" defer></script>
-  <script src="dice.js?v=7" defer></script>
-  <script src="ui.js?v=7" defer></script>
-  <script src="game.js?v=7" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+  <script src="config.js?v=8" defer></script>
+  <script src="dice.js?v=8" defer></script>
+  <script src="sprites.js?v=8" defer></script>
+  <script src="animations.js?v=8" defer></script>
+  <script src="ui.js?v=8" defer></script>
+  <script src="game.js?v=8" defer></script>
 </body>
 </html>

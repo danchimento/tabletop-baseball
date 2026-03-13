@@ -48,14 +48,18 @@ async function startPitch() {
     pVals.push(rollD6());
   }
 
-  await Promise.all(pDice.map((d, i) => spinDie(d, pVals[i])));
-  await delay(250);
+  // Run dice spin and sprite pitch animation in parallel
+  await Promise.all([
+    (async () => {
+      await Promise.all(pDice.map((d, i) => spinDie(d, pVals[i])));
+      await delay(250);
+      state.pitcherDice = await sortDice('pitcher', pVals);
+      await delay(150);
+    })(),
+    animatePitchThrow()
+  ]);
 
-  // Sort pitcher dice (highest first)
-  state.pitcherDice = await sortDice('pitcher', pVals);
-  await delay(150);
-
-  // Wait for player to press Roll for batter dice
+  // Wait for player to tap batter area
   state.phase = 'BATTER_READY';
   updateButton();
 }
@@ -86,7 +90,7 @@ async function swingBat() {
   await runBattle();
   await delay(500);
 
-  // Run outcome
+  // Run outcome — this determines what pitch result we get
   await runOutcome();
 }
 
@@ -215,6 +219,16 @@ async function runOutcome() {
 
   const pitchResult = determineOutcome(indicatorValue);
   await delay(200);
+
+  // Animate batter sprite reaction based on pitch result
+  if (pitchResult === 'contact') {
+    await animateBatterResolve(true);
+  } else if (pitchResult === 'strike' || pitchResult === 'foul') {
+    await animateSwingMiss();
+  } else {
+    await animateBallTaken();
+  }
+
   await processPitchResult(pitchResult);
 }
 
@@ -278,7 +292,7 @@ async function processPitchResult(result) {
 
     if (state.count.strikes >= 3) {
       await delay(250);
-      resolveAtBatEnd('strikeout');
+      await resolveAtBatEnd('strikeout');
       return;
     }
   } else if (result === 'foul') {
@@ -294,7 +308,7 @@ async function processPitchResult(result) {
 
     if (state.count.balls >= 4) {
       await delay(250);
-      resolveAtBatEnd('walk');
+      await resolveAtBatEnd('walk');
       return;
     }
   } else if (result === 'contact') {
@@ -311,6 +325,7 @@ async function processPitchResult(result) {
   clearBattlefield();
   state.phase = 'PRE_PITCH';
   updateButton();
+  resetSpriteScene();
   startPitchClock();
 }
 
@@ -331,14 +346,21 @@ async function openContactModal() {
   // Clean up any leftover dice rows from previous contact
   $('contact-wrapper').querySelectorAll('.contact-dice-row').forEach(r => r.remove());
 
-  const rollBtn = $('contact-roll-btn');
-  rollBtn.classList.remove('hidden');
-  rollBtn.onclick = rollContactDice;
+  // Make field tappable instead of using a button
+  const fieldView = $('field-view');
+  const tapPrompt = $('contact-tap-prompt');
+  if (tapPrompt) tapPrompt.classList.remove('hidden');
+
+  return new Promise(resolve => {
+    fieldView.onclick = () => {
+      fieldView.onclick = null;
+      if (tapPrompt) tapPrompt.classList.add('hidden');
+      rollContactDice().then(resolve);
+    };
+  });
 }
 
 async function rollContactDice() {
-  $('contact-roll-btn').classList.add('hidden');
-
   const d1 = rollD6(), d2 = rollD6();
   const sum = d1 + d2;
   const result = CONTACT_MAP[sum];
@@ -362,16 +384,15 @@ async function rollContactDice() {
   die2.classList.add('field-die');
   diceRow.appendChild(die2);
 
-  // Insert dice row between field and roll button
-  wrapper.insertBefore(diceRow, $('contact-roll-btn'));
+  wrapper.appendChild(diceRow);
 
   // Spin
   await Promise.all([spinDie(die1, d1), spinDie(die2, d2)]);
 
-  // Show dice result for 1 second before ball animation
-  await delay(1000);
+  // Show dice result briefly
+  await delay(600);
 
-  // Fade out dice (keep space reserved to prevent layout shift)
+  // Fade out dice
   diceRow.style.transition = 'opacity 0.3s';
   diceRow.style.opacity = '0';
   await delay(300);
@@ -389,8 +410,6 @@ async function rollContactDice() {
 
   // Fly baseball to target position
   if (isOutfield || isHomeRun) {
-    // Outfield: ball "flies" - gets bigger then smaller
-    // First half: ball goes up and grows
     const midX = (48 + pos.x) / 2;
     const midY = (90 + pos.y) / 2 - 10;
     ball.style.left = midX + '%';
@@ -399,14 +418,12 @@ async function rollContactDice() {
     ball.style.transform = 'scale(2.5)';
     await delay(600);
 
-    // Second half: ball descends and shrinks
     ball.style.transition = 'left 0.7s ease-in, top 0.7s ease-in, transform 0.7s ease-in';
     ball.style.left = pos.x + '%';
     ball.style.top = pos.y + '%';
     ball.style.transform = 'scale(0.8)';
     await delay(700);
   } else {
-    // Infield: ground ball, direct path
     ball.style.transition = 'left 0.8s ease-out, top 0.8s ease-out, transform 0.8s ease-out';
     ball.style.left = pos.x + '%';
     ball.style.top = pos.y + '%';
@@ -427,7 +444,7 @@ async function rollContactDice() {
 
   await delay(200);
 
-  // Show outcome text
+  // Show outcome text briefly in modal
   const outcomeEl = $('contact-outcome');
   outcomeEl.textContent = result.label;
   if (result.outcome === 'home_run') {
@@ -439,7 +456,7 @@ async function rollContactDice() {
   }
 
   addLog(`Contact: ${d1}+${d2}=${sum} — ${result.label}`);
-  await delay(1200);
+  await delay(600);
 
   // Close modal
   $('contact-modal').classList.add('hidden');
@@ -447,14 +464,15 @@ async function rollContactDice() {
   outcomeEl.textContent = '';
   outcomeEl.className = '';
 
-  resolveAtBatEnd(result.outcome);
+  // Show unified result overlay on game board
+  await resolveAtBatEnd(result.outcome);
 }
 
 // ============================================================
 // Base Running & Scoring
 // ============================================================
 
-function resolveAtBatEnd(outcome) {
+async function resolveAtBatEnd(outcome) {
   state.atBatResult = outcome;
   const batter = currentBatter();
 
@@ -497,16 +515,21 @@ function resolveAtBatEnd(outcome) {
   updateScoreboard();
   updateDiamond();
 
+  // Show unified result overlay
+  await showResultOverlay(getResultText(outcome), getResultClass(outcome));
+
   if (state.outs >= OUTS_PER_INNING) {
     state.phase = 'INNING_OVER';
     addLog(`--- Inning over. Final score: ${state.score} ---`, true);
-    updateButton();
     stopPitchClock();
+    renderSummary();
+    $('inning-summary').classList.remove('hidden');
     return;
   }
 
-  state.phase = 'AT_BAT_RESULT';
-  updateButton();
+  // Auto-advance to next batter after a brief pause
+  await delay(300);
+  nextBatter();
 }
 
 function advanceRunners(bases, batterOnBase) {
@@ -580,6 +603,7 @@ function startAtBat() {
   updateScoreboard();
   updateDiamond();
   updateButton();
+  resetSpriteScene();
 
   // Clear pitch result label
   const label = $('pitch-result-label');
@@ -596,8 +620,11 @@ function startAtBat() {
 // Init
 // ============================================================
 
-function init() {
+async function init() {
   try {
+    // Initialize sprite scene
+    await initSpriteScene();
+
     $('replay-btn').addEventListener('click', () => {
       $('inning-summary').classList.add('hidden');
       startInning();

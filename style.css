@@ -34,65 +34,36 @@ html, body {
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
-  padding: 0 8px 8px;
   overflow: hidden;
 }
 
 .hidden { display: none !important; }
 
-/* === Top Bar === */
-#top-bar {
-  padding: 8px 0;
-  border-bottom: 1px solid #333;
-  flex-shrink: 0;
+/* === Sprite Scene (top ~30%) === */
+#sprite-scene {
+  flex: 0 0 28%;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #0a0a2e 0%, #1a1a3e 60%, #2d5a1e 60%, #1a3a1a 100%);
+  border-bottom: 2px solid #333;
 }
 
-#scoreboard {
+#sprite-scene canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* === Game Board (middle ~50%) === */
+#game-board {
+  flex: 1 1 auto;
+  overflow: hidden;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  flex-direction: column;
+  position: relative;
+  padding: 0 8px;
 }
-
-#score-display { color: var(--gold); }
-
-.out-dots { letter-spacing: 2px; }
-
-#status-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-#mini-diamond { filter: drop-shadow(0 0 3px rgba(240, 192, 64, 0.3)); }
 
 .runner-on { fill: var(--gold) !important; }
-
-/* === Count === */
-#count {
-  display: flex;
-  gap: 12px;
-  font-size: 14px;
-}
-
-.count-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.count-label {
-  font-weight: 700;
-  width: 14px;
-}
-
-.count-dots { letter-spacing: 3px; font-size: 16px; }
-
-.ball-on { color: var(--green); }
-.strike-on { color: var(--red); }
 
 /* === Player Names Row === */
 #player-row {
@@ -230,6 +201,34 @@ html, body {
   justify-content: flex-start;
 }
 
+/* === Tappable Batter Area === */
+#batter-side.tappable {
+  cursor: pointer;
+  border-radius: var(--radius);
+  background: rgba(76, 175, 80, 0.08);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+  transition: background 0.3s;
+}
+
+#batter-side.tappable:active {
+  background: rgba(76, 175, 80, 0.2);
+}
+
+#tap-prompt {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 8px;
+  animation: pulse-glow 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; text-shadow: 0 0 8px rgba(76,175,80,0.6); }
+}
+
 /* === Dice Columns === */
 .dice-col {
   display: flex;
@@ -312,34 +311,65 @@ html, body {
   pointer-events: none;
 }
 
-/* === Action Button === */
-#action-area {
-  padding: 8px 0;
-  margin-top: auto;
+/* === Result Overlay === */
+#result-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+#result-overlay-text {
+  font-size: 42px;
+  font-weight: 900;
+  text-transform: uppercase;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+  animation: result-zoom 0.4s ease-out forwards;
+}
+
+@keyframes result-zoom {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.result-k    { color: var(--red); }
+.result-walk { color: var(--green); }
+.result-hit  { color: var(--green); }
+.result-hr   { color: var(--gold); font-size: 48px; }
+.result-out  { color: var(--red); }
+
+/* === TV-Style Status Bar (bottom) === */
+#tv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(to bottom, #1a1a2eee, #0d0d1fee);
+  border-top: 2px solid #333;
+  font-size: 14px;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
-#action-btn {
-  width: 100%;
-  min-height: 52px;
-  font-size: 20px;
-  font-weight: 700;
-  font-family: var(--font);
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
-}
-
-#action-btn:active:not(:disabled) { transform: scale(0.97); }
-#action-btn:disabled { background: #444; color: #888; cursor: default; }
+#tv-diamond { filter: drop-shadow(0 0 3px rgba(240, 192, 64, 0.3)); }
+#tv-outs    { color: var(--text); }
+#tv-inning  { color: var(--text-dim); }
+#tv-score   { color: var(--gold); font-size: 20px; }
+#tv-count   { display: flex; gap: 8px; font-size: 12px; }
+#tv-balls   { color: var(--green); }
+#tv-strikes { color: var(--red); }
+.tv-sep     { color: #444; }
 
 /* === Debug FAB & Panel === */
 #debug-fab {
   position: fixed;
-  bottom: 16px;
+  bottom: 68px;
   right: 16px;
   width: 40px;
   height: 40px;
@@ -356,7 +386,7 @@ html, body {
 
 #debug-panel {
   position: fixed;
-  bottom: 66px;
+  bottom: 118px;
   right: 16px;
   width: 260px;
   background: var(--surface);
@@ -416,15 +446,15 @@ html, body {
 /* === Pitch Clock Overlay === */
 #pitch-clock-overlay {
   position: fixed;
-  bottom: 16px;
+  bottom: 68px;
   left: 16px;
   z-index: 50;
   pointer-events: none;
 }
 
 #pitch-clock-display {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: 4px;
   border: 2px solid #444;
   background: #0a0a0a;
@@ -442,7 +472,7 @@ html, body {
 
 #pitch-clock-time {
   font-family: 'Courier New', monospace;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   color: #ff6600;
   text-shadow: 0 0 10px rgba(255,102,0,0.6), 0 0 20px rgba(255,102,0,0.3);
@@ -480,6 +510,7 @@ html, body {
   position: relative;
   width: 100%;
   aspect-ratio: 300 / 280;
+  cursor: pointer;
 }
 
 #baseball-field {
@@ -571,18 +602,19 @@ html, body {
 #contact-outcome.outcome-hit { color: var(--green); }
 #contact-outcome.outcome-hr { color: var(--gold); font-size: 36px; }
 
-#contact-roll-btn {
-  min-width: 120px;
-  min-height: 44px;
-  font-size: 18px;
+/* Contact tap prompt */
+#contact-tap-prompt {
+  position: absolute;
+  bottom: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
   font-weight: 700;
-  font-family: var(--font);
-  background: var(--green);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: 1px;
   z-index: 10;
+  animation: pulse-glow 1.2s ease-in-out infinite;
 }
 
 /* === Inning Summary === */
