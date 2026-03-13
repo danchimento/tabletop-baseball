@@ -2,9 +2,9 @@
 // animations.js — Frame-Based Sprite Animation
 // ============================================================
 //
-// Swaps pre-drawn silhouette pose frames on a GSAP timeline.
+// Swaps pre-drawn pixel art pose frames on a GSAP timeline.
 // No rotation tweening — each frame is a complete character pose
-// drawn at design time, giving crisp sprite-sheet-quality motion.
+// rendered from a pixel grid, giving crisp retro sprite-sheet motion.
 // ============================================================
 
 // Pitch throw: wind-up → stride → release → follow-through
