@@ -121,81 +121,114 @@ function showPitchResultLabel(text, cssClass) {
 }
 
 // ============================================================
-// UI Updates
+// Result Overlay (unified for all AB results)
+// ============================================================
+
+function getResultText(outcome) {
+  const map = {
+    strikeout: 'Strikeout!',
+    walk: 'Walk',
+    ground_out: 'Out!',
+    single: 'Single!',
+    double: 'Double!',
+    home_run: 'HOME RUN!'
+  };
+  return map[outcome] || outcome;
+}
+
+function getResultClass(outcome) {
+  const map = {
+    strikeout: 'result-k',
+    walk: 'result-walk',
+    ground_out: 'result-out',
+    single: 'result-hit',
+    double: 'result-hit',
+    home_run: 'result-hr'
+  };
+  return map[outcome] || '';
+}
+
+async function showResultOverlay(text, cssClass, durationMs) {
+  durationMs = durationMs || 1500;
+  const overlay = $('result-overlay');
+  const textEl = $('result-overlay-text');
+  textEl.textContent = text;
+  textEl.className = cssClass;
+  overlay.classList.remove('hidden');
+  await delay(durationMs);
+  overlay.classList.add('hidden');
+}
+
+// ============================================================
+// UI Updates (TV Bar)
 // ============================================================
 
 function updateScoreboard() {
-  $('score-display').textContent = `Score: ${state.score}`;
-  const dots = Array.from({ length: 3 }, (_, i) => i < state.outs ? '\u25CF' : '\u25CB').join('');
-  $('outs-display').innerHTML = `Outs: <span class="out-dots">${dots}</span>`;
-  $('inning-display').textContent = 'Top 1st';
+  const scoreEl = $('tv-score');
+  if (scoreEl) scoreEl.textContent = state.score;
+
+  const outsEl = $('tv-outs');
+  if (outsEl) {
+    outsEl.textContent = state.outs === 1 ? '1 Out' : `${state.outs} Outs`;
+  }
+
+  const inningEl = $('tv-inning');
+  if (inningEl) inningEl.textContent = 'Top 1';
 }
 
 function updateDiamond() {
   for (let i = 0; i < 3; i++) {
-    const base = $(`base-${i + 1}`);
-    if (state.runners[i]) {
-      base.classList.add('runner-on');
-    } else {
-      base.classList.remove('runner-on');
+    const base = $(`tv-base-${i + 1}`);
+    if (base) {
+      if (state.runners[i]) {
+        base.classList.add('runner-on');
+      } else {
+        base.classList.remove('runner-on');
+      }
     }
   }
 }
 
 function updateCount() {
-  const balls = Array.from({ length: 4 }, (_, i) =>
-    `<span class="${i < state.count.balls ? 'ball-on' : ''}">${i < state.count.balls ? '\u25CF' : '\u25CB'}</span>`
-  ).join('');
-  const strikes = Array.from({ length: 3 }, (_, i) =>
-    `<span class="${i < state.count.strikes ? 'strike-on' : ''}">${i < state.count.strikes ? '\u25CF' : '\u25CB'}</span>`
-  ).join('');
-  $('balls-dots').innerHTML = balls;
-  $('strikes-dots').innerHTML = strikes;
+  const ballsEl = $('tv-balls');
+  if (ballsEl) ballsEl.textContent = `B: ${state.count.balls}`;
+
+  const strikesEl = $('tv-strikes');
+  if (strikesEl) strikesEl.textContent = `S: ${state.count.strikes}`;
 }
 
 function updateBatterName() {
   $('batter-name').textContent = currentBatter().name;
 }
 
+// ============================================================
+// Tappable Batter Area (replaces action button)
+// ============================================================
+
 function updateButton() {
-  const btn = $('action-btn');
+  const batterSide = $('batter-side');
+  const tapPrompt = $('tap-prompt');
+
+  // Clear interactive state
+  batterSide.classList.remove('tappable');
+  batterSide.onclick = null;
+  if (tapPrompt) tapPrompt.classList.add('hidden');
+
   switch (state.phase) {
-    case 'PRE_PITCH':
-      btn.textContent = 'Pitching...';
-      btn.disabled = true;
-      btn.onclick = null;
-      break;
-    case 'ANIMATING':
-      btn.textContent = '...';
-      btn.disabled = true;
-      btn.onclick = null;
-      break;
     case 'BATTER_READY':
-      btn.textContent = 'Roll!';
-      btn.disabled = false;
-      btn.onclick = () => {
+      batterSide.classList.add('tappable');
+      if (tapPrompt) tapPrompt.classList.remove('hidden');
+      batterSide.onclick = () => {
         if (state.phase === 'BATTER_READY') {
           swingBat();
         }
       };
       break;
-    case 'CONTACT':
-      btn.textContent = '...';
-      btn.disabled = true;
-      btn.onclick = null;
-      break;
-    case 'AT_BAT_RESULT':
-      btn.textContent = 'Next Batter';
-      btn.disabled = false;
-      btn.onclick = nextBatter;
-      break;
     case 'INNING_OVER':
-      btn.textContent = 'View Summary';
-      btn.disabled = false;
-      btn.onclick = () => {
+      setTimeout(() => {
         renderSummary();
         $('inning-summary').classList.remove('hidden');
-      };
+      }, 500);
       break;
   }
 }
