@@ -1,20 +1,27 @@
 // ============================================================
-// animations.js — GSAP Animation Timelines for Sprite Scene
+// animations.js — Frame-Based Sprite Animation
+// ============================================================
+//
+// Swaps pre-drawn silhouette pose frames on a GSAP timeline.
+// No rotation tweening — each frame is a complete character pose
+// drawn at design time, giving crisp sprite-sheet-quality motion.
 // ============================================================
 
-// Pitch throw: wind-up, release, ball travels, bullet-time pause
+// Pitch throw: wind-up → stride → release → follow-through
+// Ball travels from release point to midpoint, then bullet-time pause
 async function animatePitchThrow() {
   if (!sceneReady) return;
 
-  const s = CHAR_SCALE;
   const pitcherX = sceneW * PITCHER_X_PCT;
   const batterX = sceneW * BATTER_X_PCT;
   const groundY = sceneH * GROUND_Y_PCT;
   const midX = (pitcherX + batterX) / 2;
-  const ballY = groundY - 38 * s;
 
-  // Position ball at pitcher's hand
-  ballSprite.x = pitcherX + 22 * s;
+  // Ball starts at pitcher's release hand position
+  const ballX = pitcherX + PITCHER_RELEASE_HAND.x;
+  const ballY = groundY + PITCHER_RELEASE_HAND.y;
+
+  ballSprite.x = ballX;
   ballSprite.y = ballY;
   ballSprite.alpha = 1;
   ballSprite.visible = false;
@@ -22,29 +29,36 @@ async function animatePitchThrow() {
   return new Promise(resolve => {
     const tl = gsap.timeline({ onComplete: resolve });
 
-    // 1. Wind-up: arm swings back
-    tl.to(pitcherArm, { rotation: -1.0, duration: 0.3, ease: 'power2.in' });
+    // 1. Wind-up (t=0.00)
+    tl.call(() => showPitcherFrame('windup'), null, 0);
 
-    // 2. Arm swings forward, ball appears
-    tl.to(pitcherArm, { rotation: 0.5, duration: 0.15, ease: 'power3.out' });
-    tl.call(() => { ballSprite.visible = true; }, null, '-=0.05');
+    // 2. Stride (t=0.30)
+    tl.call(() => showPitcherFrame('stride'), null, 0.30);
 
-    // 3. Ball travels at full speed toward midpoint
-    tl.to(ballSprite, { x: midX, duration: 0.25, ease: 'power1.in' });
+    // 3. Release — ball appears (t=0.45)
+    tl.call(() => {
+      showPitcherFrame('release');
+      ballSprite.visible = true;
+    }, null, 0.45);
 
-    // 4. Bullet-time: ball slows dramatically and pauses near midpoint
-    tl.to(ballSprite, { x: midX + 30, duration: 0.6, ease: 'power4.out' });
+    // 4. Ball travels at full speed toward midpoint (0.25s)
+    tl.to(ballSprite, { x: midX, duration: 0.25, ease: 'power1.in' }, 0.48);
 
-    // 5. Arm settles back
-    tl.to(pitcherArm, { rotation: 0, duration: 0.3, ease: 'power1.out' }, '-=0.5');
+    // 5. Follow-through (t=0.55)
+    tl.call(() => showPitcherFrame('followThrough'), null, 0.55);
+
+    // 6. Bullet-time: ball slows dramatically near midpoint (0.6s)
+    tl.to(ballSprite, { x: midX + 30, duration: 0.6, ease: 'power4.out' }, 0.73);
+
+    // 7. Pitcher returns to idle (t=1.20)
+    tl.call(() => showPitcherFrame('idle'), null, 1.20);
   });
 }
 
-// Batter resolves: ball continues, batter reacts
+// Batter resolves: ball continues, batter reacts based on contact
 async function animateBatterResolve(didMakeContact) {
   if (!sceneReady) return;
 
-  const s = CHAR_SCALE;
   const batterX = sceneW * BATTER_X_PCT;
   const pitcherX = sceneW * PITCHER_X_PCT;
   const midX = (pitcherX + batterX) / 2;
@@ -53,35 +67,43 @@ async function animateBatterResolve(didMakeContact) {
   return new Promise(resolve => {
     const tl = gsap.timeline({ onComplete: resolve });
 
-    // 1. Ball resumes toward batter at full speed
-    tl.to(ballSprite, { x: batterX - 15, duration: 0.2, ease: 'power2.in' });
-
     if (didMakeContact) {
-      // 2a. Bat swings through
-      tl.to(batterBat, { rotation: -1.5, duration: 0.12, ease: 'power3.in' }, '-=0.12');
+      // Load stance — weight shifts back
+      tl.call(() => showBatterFrame('load'), null, 0);
 
-      // 3a. Ball reverses upward (hit!)
+      // Ball resumes toward batter
+      tl.to(ballSprite, { x: batterX - 15, duration: 0.2, ease: 'power2.in' }, 0);
+
+      // Swing through contact
+      tl.call(() => showBatterFrame('swing'), null, 0.16);
+
+      // Ball reverses upward (hit!)
       tl.to(ballSprite, {
         x: midX - 40,
-        y: groundY - 100 * s,
+        y: groundY - 100,
         duration: 0.5,
         ease: 'power2.out'
-      });
-      tl.to(ballSprite, { alpha: 0, duration: 0.2 }, '-=0.2');
+      }, 0.22);
+      tl.to(ballSprite, { alpha: 0, duration: 0.2 }, 0.52);
+
+      // Follow-through
+      tl.call(() => showBatterFrame('followThrough'), null, 0.30);
+
+      // Return to stance
+      tl.call(() => showBatterFrame('stance'), null, 0.75);
     } else {
-      // 2b. Ball passes by — check if it's a take or a swing-and-miss
-      // For strikes/fouls, batter swings and misses
-      // For balls, batter takes (no swing)
+      // Ball passes by (no contact)
+      tl.to(ballSprite, { x: batterX - 15, duration: 0.2, ease: 'power2.in' });
       tl.to(ballSprite, { x: batterX + 30, duration: 0.1, ease: 'none' });
       tl.to(ballSprite, { alpha: 0, duration: 0.15 });
-    }
 
-    // 4. Bat returns to ready position
-    tl.to(batterBat, { rotation: 0.7, duration: 0.3, ease: 'power1.out' }, '-=0.2');
+      // Return to stance
+      tl.call(() => showBatterFrame('stance'), null, '+=0.15');
+    }
   });
 }
 
-// Swing and miss animation (for strikes)
+// Swing and miss (for strikes/fouls)
 async function animateSwingMiss() {
   if (!sceneReady) return;
 
@@ -90,18 +112,24 @@ async function animateSwingMiss() {
   return new Promise(resolve => {
     const tl = gsap.timeline({ onComplete: resolve });
 
-    // Ball continues toward batter
-    tl.to(ballSprite, { x: batterX - 15, duration: 0.2, ease: 'power2.in' });
+    // Load
+    tl.call(() => showBatterFrame('load'), null, 0);
 
-    // Bat swings and misses
-    tl.to(batterBat, { rotation: -1.5, duration: 0.12, ease: 'power3.in' }, '-=0.12');
+    // Ball continues toward batter
+    tl.to(ballSprite, { x: batterX - 15, duration: 0.2, ease: 'power2.in' }, 0);
+
+    // Swing and miss
+    tl.call(() => showBatterFrame('swing'), null, 0.14);
 
     // Ball passes through
-    tl.to(ballSprite, { x: batterX + 30, duration: 0.1, ease: 'none' });
-    tl.to(ballSprite, { alpha: 0, duration: 0.15 });
+    tl.to(ballSprite, { x: batterX + 30, duration: 0.1, ease: 'none' }, 0.22);
+    tl.to(ballSprite, { alpha: 0, duration: 0.15 }, 0.32);
 
-    // Bat returns
-    tl.to(batterBat, { rotation: 0.7, duration: 0.3, ease: 'power1.out' });
+    // Follow-through
+    tl.call(() => showBatterFrame('followThrough'), null, 0.28);
+
+    // Return to stance
+    tl.call(() => showBatterFrame('stance'), null, 0.55);
   });
 }
 
@@ -114,7 +142,7 @@ async function animateBallTaken() {
   return new Promise(resolve => {
     const tl = gsap.timeline({ onComplete: resolve });
 
-    // Ball continues past batter (no swing)
+    // Ball continues past batter (no swing — stays in stance)
     tl.to(ballSprite, { x: batterX + 30, duration: 0.25, ease: 'power1.in' });
     tl.to(ballSprite, { alpha: 0, duration: 0.15 });
   });
