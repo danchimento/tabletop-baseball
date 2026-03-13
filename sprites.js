@@ -1,10 +1,10 @@
 // ============================================================
-// sprites.js — Stylized Silhouette Characters (Frame-Based)
+// sprites.js — Retro Pixel Art Characters (Frame-Based)
 // ============================================================
 //
-// Professional silhouette art style with team color accents.
-// Each character has pre-drawn pose frames that swap instantly
-// (sprite-sheet approach) during animation.
+// 16-bit style pixel art sprites rendered to PixiJS textures.
+// Each pose is a hand-crafted pixel grid at native resolution,
+// scaled up with nearest-neighbor for crisp retro look.
 // ============================================================
 
 let spriteApp = null;
@@ -16,11 +16,30 @@ const PITCHER_X_PCT = 0.25;
 const BATTER_X_PCT = 0.75;
 const GROUND_Y_PCT = 0.62;
 
-// --- Silhouette Palette ---
-const SIL = 0x0d0d1a;              // Near-black body
-const PITCHER_ACCENT = 0xc0392b;    // Red team
-const BATTER_ACCENT = 0x27ae60;     // Green team
-const BAT_WOOD = 0xb89858;          // Visible wood color
+// --- Pixel Art Palette ---
+const P = {
+  _: null,          // transparent
+  K: 0x0d0d1a,     // black (outline)
+  R: 0xc0392b,     // red (pitcher jersey)
+  r: 0xe74c3c,     // light red (pitcher highlight)
+  G: 0x27ae60,     // green (batter jersey)
+  g: 0x2ecc71,     // light green (batter highlight)
+  S: 0xf0c8a0,     // skin
+  s: 0xd4a574,     // skin shadow
+  W: 0xffffff,     // white
+  w: 0xcccccc,     // light gray
+  H: 0x8B6914,     // hat dark / wood
+  h: 0xb89858,     // hat light / bat wood
+  B: 0x5c3317,     // brown (glove)
+  b: 0x7a4a2a,     // light brown (glove highlight)
+  N: 0x2c3e50,     // navy (pants)
+  n: 0x34495e,     // navy highlight
+  T: 0x1a1a2e,     // dark (cleats)
+  Y: 0xf0c040,     // yellow/gold accent
+};
+
+// Pixel size when rendered (each pixel in the grid = PX×PX on screen)
+const PX = 3;
 
 // --- Frame state ---
 const pitcherFrames = {};
@@ -32,7 +51,7 @@ let currentPitcherFrame = 'idle';
 let currentBatterFrame = 'stance';
 
 // Ball spawn point for the release frame (local to pitcher container)
-const PITCHER_RELEASE_HAND = { x: 22, y: -42 };
+const PITCHER_RELEASE_HAND = { x: 24, y: -40 };
 
 // ============================================================
 // Init
@@ -47,7 +66,7 @@ async function initSpriteScene() {
     await spriteApp.init({
       resizeTo: container,
       backgroundAlpha: 0,
-      antialias: true,
+      antialias: false, // crisp pixels
     });
     container.appendChild(spriteApp.canvas);
 
@@ -74,15 +93,10 @@ function drawBackground() {
   const bg = new PIXI.Graphics();
   const groundY = sceneH * GROUND_Y_PCT;
 
-  // Sky
   bg.rect(0, 0, sceneW, groundY).fill(0x1a1a3e);
-  // Ground
   bg.rect(0, groundY, sceneW, sceneH - groundY).fill(0x2d5a1e);
-  // Dirt line
   bg.rect(0, groundY - 2, sceneW, 4).fill(0x8B6914);
-  // Mound
   bg.ellipse(sceneW * PITCHER_X_PCT, groundY - 6, 50, 12).fill(0x8B6914);
-  // Home plate
   const px = sceneW * BATTER_X_PCT;
   bg.rect(px - 4, groundY - 2, 8, 4).fill(0xffffff);
 
@@ -112,51 +126,301 @@ function showBatterFrame(name) {
 }
 
 // ============================================================
-// Drawing helpers
+// Pixel Grid Renderer
 // ============================================================
 
-// Draw a limb segment between two points as a thick round-cap stroke.
-// Overlapping strokes in the same color merge into a unified silhouette.
-function limb(g, x1, y1, x2, y2, w) {
-  g.moveTo(x1, y1).lineTo(x2, y2)
-    .stroke({ width: w, color: SIL, cap: 'round' });
+// Takes a 2D array of palette keys and renders to a PIXI.Container
+// Each cell = PX×PX pixels. Origin is bottom-center of the grid.
+function renderPixelGrid(grid) {
+  const container = new PIXI.Container();
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const g = new PIXI.Graphics();
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = grid[r][c];
+      if (key === '_') continue;
+      const color = P[key];
+      if (color == null) continue;
+      g.rect(c * PX, r * PX, PX, PX).fill(color);
+    }
+  }
+
+  container.addChild(g);
+
+  // Offset so origin = bottom-center
+  container.pivot.set((cols * PX) / 2, rows * PX);
+
+  return container;
+}
+
+// Helper: convert a compact string grid to 2D array
+// Each char is a palette key, rows separated by newlines
+function grid(str) {
+  return str.trim().split('\n').map(row => row.trim().split(''));
 }
 
 // ============================================================
-// Pitcher — 5 pose frames
+// Pitcher Pixel Art — 5 Poses (facing right)
 // ============================================================
-// Local coords: (0,0) = feet at ground level, y-negative = up
-// Facing RIGHT toward the batter
+// Grid is ~16 wide × 22 tall (48×66 px at PX=3)
+
+const PITCHER_GRIDS = {};
+
+// --- Idle: standing relaxed on mound ---
+PITCHER_GRIDS.idle = grid(`
+____KKKK________
+___KRrRRK_______
+___KRRRRKK______
+____KKKK________
+____KSsK________
+____KSKK________
+___KKWWKK_______
+__KKRrRRKK______
+__KRRrRRRK______
+__KRRWRRRKBb____
+__KKRRRRKK_K____
+___sKKKKKs______
+____KNNNK_______
+____KNNNK_______
+____KNNKK_______
+____KNnNK_______
+____KNKNK_______
+____KKKK________
+____KTKKT_______
+____KTKKT_______
+____KKKK________
+`);
+
+// --- Wind-up: leg raised, hands together overhead ---
+PITCHER_GRIDS.windup = grid(`
+____KKKK________
+___KRrRRK_______
+___KRRRRKK______
+____KKKK________
+____KSsK________
+___BbSSK________
+__K_KWWKK_______
+__KKRrRRKK______
+___KRRrRRK______
+___KRRWRRKK_____
+___KKRRRRKK_____
+____KKKKK_______
+____KNNNK_______
+____KNKK________
+____KNK_________
+____KKK_KNNK____
+_________KNKK___
+__________KKK___
+____KTKK________
+____KTKK________
+____KKKK________
+`);
+
+// --- Stride: stepping forward, arm cocked back ---
+PITCHER_GRIDS.stride = grid(`
+______KKKK______
+_____KRrRRK_____
+_____KRRRRKK____
+______KKKK______
+______KSsK______
+______KSKK______
+__Ss_KKWWKK_____
+_K_KKRrRRKK_____
+_Ss_KRRrRRKKK___
+_K___KRRWRR_KK__
+______KRRRRK____
+______KKKKK_____
+_____KNNNKK_____
+_____KNnNK______
+____KNnNK_______
+____KNKK__KNNK__
+____KKK____KNKK_
+____________KKK_
+___KTKK___KTKK__
+___KTKK___KTKK__
+___KKKK___KKKK__
+`);
+
+// --- Release: arm extended forward, ball at hand ---
+PITCHER_GRIDS.release = grid(`
+_______KKKK_____
+______KRrRRK____
+______KRRRRKK___
+_______KKKK_____
+_______KSsK_____
+_______KSKK_____
+______KKWWKK____
+_____KKRrRRKKSsW
+_____KRRrRRRKK__
+__Bb_KRRWRRRKK__
+__K__KKRRRRKK___
+______KKKKK_____
+______KNNNK_____
+_____KNnNK______
+____KNnNK_______
+____KNKK__KNNK__
+____KKK____KNKK_
+____________KKK_
+___KTKK___KTKK__
+___KTKK___KTKK__
+___KKKK___KKKK__
+`);
+
+// --- Follow-through: arm across body ---
+PITCHER_GRIDS.followThrough = grid(`
+________KKKK____
+_______KRrRRK___
+_______KRRRRKK__
+________KKKK____
+________KSsK____
+________KSKK____
+_______KKWWKK___
+______KKRrRRKK__
+______KRRrRRRK__
+___Ss_KRRWRRRKK_
+__KK__KKRRRRKK__
+__BbK__KKKKK____
+_______KNNNK____
+______KNnNK_____
+_____KNnNK______
+_____KNKK_KNNK__
+_____KKK___KNKK_
+____________KKK_
+___KTKK___KTKK__
+___KTKK___KTKK__
+___KKKK___KKKK__
+`);
+
+// ============================================================
+// Batter Pixel Art — 4 Poses (facing left)
+// ============================================================
+
+const BATTER_GRIDS = {};
+
+// --- Stance: athletic ready position, bat on shoulder ---
+BATTER_GRIDS.stance = grid(`
+___________hK___
+__________hHK___
+_________hHK____
+________KKKK____
+_______KGgGGK___
+_______KGGGRKK__
+________KKKK____
+________KSsK____
+________KSKK____
+_______KKWWKK___
+______KKGgGGKK__
+______KGGgGGGK__
+______KGGWGGKK__
+______KKGGGKK___
+_______KKKKK____
+_______KNNNK____
+_______KNNNK____
+_______KNNKK____
+_______KNnNK____
+_______KNKNK____
+________KKKK____
+_______KTKKT____
+_______KTKKT____
+________KKKK____
+`);
+
+// --- Load: weight shifted back, bat cocked ---
+BATTER_GRIDS.load = grid(`
+____________hK__
+___________hHK__
+__________hHK___
+_________hHK____
+________KKKK____
+_______KGgGGK___
+_______KGGGRKK__
+________KKKK____
+________KSsK____
+________KSKK____
+_______KKWWKK___
+______KKGgGGKKs_
+______KGGgGGGKK_
+______KGGWGGKK__
+______KKGGGKK___
+_______KKKKK____
+_______KNNNK____
+_______KNNNK____
+______KNNKK_____
+______KNnNK_____
+_______KNKNK____
+________KKKK____
+______KTKK_KTK__
+______KTKK_KTK__
+_______KKK_KKK__
+`);
+
+// --- Swing: bat horizontal through zone ---
+BATTER_GRIDS.swing = grid(`
+________KKKK____
+_______KGgGGK___
+_______KGGGRKK__
+________KKKK____
+________KSsK____
+________KSKK____
+_______KKWWKK___
+______KKGgGGKK__
+______KGGgGGGK__
+_KhHhHKGGWGGKK__
+_______KKGGGKK__
+________KKKKK___
+_______KNNNK____
+_______KNNNK____
+______KNNKK_____
+______KNnNK_____
+_______KNKNK____
+________KKKK____
+______KTKK_KTK__
+______KTKK_KTK__
+_______KKK_KKK__
+`);
+
+// --- Follow-through: bat wraps around behind ---
+BATTER_GRIDS.followThrough = grid(`
+___K____________
+___Kh___________
+___KHh__________
+____KHh_________
+________KKKK____
+_______KGgGGK___
+_______KGGGRKK__
+________KKKK____
+________KSsK____
+_______KKSKK____
+______KKWWKK____
+_____KKGgGGKK___
+_____KGGgGGGK___
+_____KGGWGGKK___
+______KKGGGKK___
+_______KKKKK____
+______KNNNK_____
+______KNNNK_____
+_____KNNKK______
+_____KNnNK______
+______KNKNK_____
+_______KKKK_____
+_____KTKK_KTK__
+_____KTKK_KTK__
+______KKK_KKK__
+`);
+
+// ============================================================
+// Build Characters
+// ============================================================
 
 function buildPitcher() {
   pitcherContainer = new PIXI.Container();
   pitcherContainer.x = sceneW * PITCHER_X_PCT;
   pitcherContainer.y = sceneH * GROUND_Y_PCT;
 
-  // Subtle team-color backlight
-  const glow = new PIXI.Graphics();
-  glow.circle(0, -32, 40).fill({ color: PITCHER_ACCENT, alpha: 0.06 });
-  pitcherContainer.addChild(glow);
-
-  const poses = {
-    idle: drawPitcherIdle,
-    windup: drawPitcherWindup,
-    stride: drawPitcherStride,
-    release: drawPitcherRelease,
-    followThrough: drawPitcherFollowThrough,
-  };
-
-  for (const [name, drawFn] of Object.entries(poses)) {
-    const frame = new PIXI.Container();
-    const g = new PIXI.Graphics();
-    const headPos = drawFn(g);
-    frame.addChild(g);
-
-    // Team-color cap
-    const cap = new PIXI.Graphics();
-    drawCap(cap, headPos.x, headPos.y);
-    frame.addChild(cap);
-
+  for (const [name, g] of Object.entries(PITCHER_GRIDS)) {
+    const frame = renderPixelGrid(g);
     frame.visible = (name === 'idle');
     pitcherFrames[name] = frame;
     pitcherContainer.addChild(frame);
@@ -165,186 +429,13 @@ function buildPitcher() {
   spriteApp.stage.addChild(pitcherContainer);
 }
 
-function drawCap(g, hx, hy) {
-  g.roundRect(hx - 9, hy - 10, 18, 7, 2).fill(PITCHER_ACCENT);
-  g.rect(hx + 3, hy - 5, 9, 3).fill(PITCHER_ACCENT); // brim toward batter
-}
-
-// --- Idle: relaxed standing, glove at side ---
-function drawPitcherIdle(g) {
-  // Legs
-  limb(g, -7, -22, -8, -10, 6);
-  limb(g, -8, -10, -10, 2, 5.5);
-  limb(g, 7, -22, 8, -10, 6);
-  limb(g, 8, -10, 10, 2, 5.5);
-
-  // Glove arm (left)
-  limb(g, -9, -44, -15, -33, 4.5);
-  limb(g, -15, -33, -12, -24, 4.5);
-  g.circle(-12, -24, 4).fill(SIL);
-
-  // Throwing arm (right)
-  limb(g, 9, -44, 14, -33, 4.5);
-  limb(g, 14, -33, 12, -26, 4.5);
-
-  // Torso
-  g.roundRect(-9, -46, 18, 26, 3).fill(SIL);
-  g.rect(-9, -40, 18, 2).fill({ color: PITCHER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(0, -54, 8).fill(SIL);
-
-  return { x: 0, y: -54 };
-}
-
-// --- Wind-up: lead leg raised, hands together overhead ---
-function drawPitcherWindup(g) {
-  // Planted back leg (left)
-  limb(g, -6, -22, -8, -10, 6);
-  limb(g, -8, -10, -9, 2, 5.5);
-
-  // Raised lead leg (right) — knee up, shin hanging
-  limb(g, 6, -22, 10, -34, 6);
-  limb(g, 10, -34, 7, -26, 5.5);
-
-  // Arms together overhead
-  limb(g, -8, -46, -3, -56, 4.5);
-  limb(g, -3, -56, 0, -64, 4.5);
-  limb(g, 8, -46, 3, -56, 4.5);
-  limb(g, 3, -56, 0, -64, 4.5);
-  g.circle(0, -64, 4).fill(SIL); // glove + ball
-
-  // Torso
-  g.roundRect(-9, -48, 18, 26, 3).fill(SIL);
-  g.rect(-9, -42, 18, 2).fill({ color: PITCHER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(1, -56, 8).fill(SIL);
-
-  return { x: 1, y: -56 };
-}
-
-// --- Stride: stepping forward, arm cocked behind ---
-function drawPitcherStride(g) {
-  // Back leg (pushing off)
-  limb(g, -6, -22, -10, -10, 6);
-  limb(g, -10, -10, -14, 2, 5.5);
-
-  // Lead leg (striding forward)
-  limb(g, 6, -22, 14, -10, 6);
-  limb(g, 14, -10, 18, 2, 5.5);
-
-  // Glove arm (extending forward)
-  limb(g, -6, -42, 4, -38, 4.5);
-  limb(g, 4, -38, 12, -36, 4.5);
-  g.circle(12, -36, 4).fill(SIL);
-
-  // Throwing arm (cocked behind head)
-  limb(g, 4, -42, -2, -50, 4.5);
-  limb(g, -2, -50, -8, -56, 4.5);
-
-  // Torso (leaning forward)
-  g.roundRect(-7, -44, 16, 24, 3).fill(SIL);
-  g.rect(-7, -38, 16, 2).fill({ color: PITCHER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(5, -52, 8).fill(SIL);
-
-  return { x: 5, y: -52 };
-}
-
-// --- Release: arm extended forward, ball releasing ---
-function drawPitcherRelease(g) {
-  // Back leg
-  limb(g, -6, -20, -10, -8, 6);
-  limb(g, -10, -8, -14, 2, 5.5);
-
-  // Front leg (planted)
-  limb(g, 6, -22, 16, -10, 6);
-  limb(g, 16, -10, 20, 2, 5.5);
-
-  // Glove arm (pulling in)
-  limb(g, -4, -40, -2, -32, 4.5);
-  limb(g, -2, -32, -6, -26, 4.5);
-  g.circle(-6, -26, 4).fill(SIL);
-
-  // Throwing arm (extended forward — release point!)
-  limb(g, 8, -40, 16, -44, 4.5);
-  limb(g, 16, -44, 22, -42, 4.5);
-
-  // Torso (rotated forward)
-  g.roundRect(-5, -42, 16, 22, 3).fill(SIL);
-  g.rect(-5, -36, 16, 2).fill({ color: PITCHER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(8, -50, 8).fill(SIL);
-
-  return { x: 8, y: -50 };
-}
-
-// --- Follow-through: arm across body ---
-function drawPitcherFollowThrough(g) {
-  // Back leg (trailing)
-  limb(g, -4, -20, -2, -8, 6);
-  limb(g, -2, -8, -6, 2, 5.5);
-
-  // Front leg (bearing weight)
-  limb(g, 6, -22, 16, -10, 6);
-  limb(g, 16, -10, 20, 2, 5.5);
-
-  // Glove arm (tucked)
-  limb(g, -2, -38, 4, -30, 4.5);
-  limb(g, 4, -30, 2, -24, 4.5);
-  g.circle(2, -24, 4).fill(SIL);
-
-  // Throwing arm (across body)
-  limb(g, 6, -40, 0, -32, 4.5);
-  limb(g, 0, -32, -10, -28, 4.5);
-
-  // Torso
-  g.roundRect(-3, -40, 14, 22, 3).fill(SIL);
-  g.rect(-3, -34, 14, 2).fill({ color: PITCHER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(8, -48, 8).fill(SIL);
-
-  return { x: 8, y: -48 };
-}
-
-// ============================================================
-// Batter — 4 pose frames
-// ============================================================
-// Local coords: (0,0) = feet at ground level, y-negative = up
-// Facing LEFT toward the pitcher
-
 function buildBatter() {
   batterContainer = new PIXI.Container();
   batterContainer.x = sceneW * BATTER_X_PCT;
   batterContainer.y = sceneH * GROUND_Y_PCT;
 
-  // Subtle team-color backlight
-  const glow = new PIXI.Graphics();
-  glow.circle(0, -32, 40).fill({ color: BATTER_ACCENT, alpha: 0.06 });
-  batterContainer.addChild(glow);
-
-  const poses = {
-    stance: drawBatterStance,
-    load: drawBatterLoad,
-    swing: drawBatterSwing,
-    followThrough: drawBatterFollowThrough,
-  };
-
-  for (const [name, drawFn] of Object.entries(poses)) {
-    const frame = new PIXI.Container();
-    const g = new PIXI.Graphics();
-    const headPos = drawFn(g);
-    frame.addChild(g);
-
-    // Team-color helmet
-    const helmet = new PIXI.Graphics();
-    drawHelmet(helmet, headPos.x, headPos.y);
-    frame.addChild(helmet);
-
+  for (const [name, g] of Object.entries(BATTER_GRIDS)) {
+    const frame = renderPixelGrid(g);
     frame.visible = (name === 'stance');
     batterFrames[name] = frame;
     batterContainer.addChild(frame);
@@ -353,142 +444,19 @@ function buildBatter() {
   spriteApp.stage.addChild(batterContainer);
 }
 
-function drawHelmet(g, hx, hy) {
-  // Helmet covering top of head
-  g.arc(hx, hy, 9.5, -Math.PI, 0).fill(BATTER_ACCENT);
-  // Ear flap (back/right side)
-  g.roundRect(hx + 4, hy - 4, 5, 10, 2).fill(BATTER_ACCENT);
-  // Brim toward pitcher (left)
-  g.rect(hx - 13, hy - 3, 11, 3).fill(BATTER_ACCENT);
-}
-
-// --- Stance: athletic batting stance, bat on shoulder ---
-function drawBatterStance(g) {
-  // Legs (athletic crouch)
-  limb(g, -6, -22, -10, -10, 6);
-  limb(g, -10, -10, -12, 2, 5.5);
-  limb(g, 6, -22, 9, -10, 6);
-  limb(g, 9, -10, 10, 2, 5.5);
-
-  // Arms (hands together holding bat at right shoulder)
-  limb(g, -7, -44, -1, -37, 4.5);  // left arm bottom hand
-  limb(g, -1, -37, 5, -38, 4.5);
-  limb(g, 7, -44, 7, -39, 4.5);    // right arm top hand
-  limb(g, 7, -39, 5, -38, 4.5);
-
-  // Torso
-  g.roundRect(-9, -46, 18, 26, 3).fill(SIL);
-  g.rect(-9, -40, 18, 2).fill({ color: BATTER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(-1, -54, 8).fill(SIL);
-
-  // BAT (wood color — handle from hands, barrel extends up and back)
-  g.moveTo(5, -38).lineTo(10, -50)
-    .stroke({ width: 3, color: BAT_WOOD, cap: 'round' });
-  g.moveTo(10, -50).lineTo(12, -62)
-    .stroke({ width: 4.5, color: BAT_WOOD, cap: 'round' }); // barrel
-
-  return { x: -1, y: -54 };
-}
-
-// --- Load: weight shifted back, bat cocked further ---
-function drawBatterLoad(g) {
-  // Legs (weight back)
-  limb(g, -6, -22, -8, -10, 6);
-  limb(g, -8, -10, -10, 0, 5.5);
-  limb(g, 6, -22, 10, -10, 6);
-  limb(g, 10, -10, 11, 2, 5.5);
-
-  // Arms (hands shifted back)
-  limb(g, -6, -44, 2, -38, 4.5);
-  limb(g, 2, -38, 8, -40, 4.5);
-  limb(g, 7, -44, 8, -40, 4.5);
-
-  // Torso
-  g.roundRect(-8, -46, 18, 26, 3).fill(SIL);
-  g.rect(-8, -40, 18, 2).fill({ color: BATTER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(0, -54, 8).fill(SIL);
-
-  // BAT (cocked further back)
-  g.moveTo(8, -40).lineTo(14, -52)
-    .stroke({ width: 3, color: BAT_WOOD, cap: 'round' });
-  g.moveTo(14, -52).lineTo(18, -62)
-    .stroke({ width: 4.5, color: BAT_WOOD, cap: 'round' });
-
-  return { x: 0, y: -54 };
-}
-
-// --- Swing: full extension, bat horizontal through zone ---
-function drawBatterSwing(g) {
-  // Legs (weight shifting forward)
-  limb(g, -6, -22, -12, -10, 6);
-  limb(g, -12, -10, -14, 2, 5.5);
-  limb(g, 6, -22, 5, -10, 6);
-  limb(g, 5, -10, 3, 2, 5.5);
-
-  // Arms (extended through contact zone)
-  limb(g, -7, -42, -9, -36, 4.5);
-  limb(g, -9, -36, -12, -34, 4.5);
-  limb(g, 7, -44, -2, -38, 4.5);
-  limb(g, -2, -38, -12, -34, 4.5);
-
-  // Torso (rotated)
-  g.roundRect(-8, -46, 16, 26, 3).fill(SIL);
-  g.rect(-8, -40, 16, 2).fill({ color: BATTER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(-3, -52, 8).fill(SIL);
-
-  // BAT (horizontal through zone, extending toward pitcher)
-  g.moveTo(-12, -34).lineTo(-24, -36)
-    .stroke({ width: 3, color: BAT_WOOD, cap: 'round' });
-  g.moveTo(-24, -36).lineTo(-38, -37)
-    .stroke({ width: 5, color: BAT_WOOD, cap: 'round' }); // barrel
-
-  return { x: -3, y: -52 };
-}
-
-// --- Follow-through: bat wraps around to left shoulder ---
-function drawBatterFollowThrough(g) {
-  // Legs (weight on front foot)
-  limb(g, -6, -22, -14, -10, 6);
-  limb(g, -14, -10, -16, 2, 5.5);
-  limb(g, 6, -22, 4, -10, 6);
-  limb(g, 4, -10, 2, 2, 5.5);
-
-  // Arms (wrapping around)
-  limb(g, -6, -42, -10, -46, 4.5);
-  limb(g, -10, -46, -8, -50, 4.5);
-  limb(g, 6, -42, -2, -44, 4.5);
-  limb(g, -2, -44, -8, -50, 4.5);
-
-  // Torso
-  g.roundRect(-7, -44, 14, 24, 3).fill(SIL);
-  g.rect(-7, -38, 14, 2).fill({ color: BATTER_ACCENT, alpha: 0.35 });
-
-  // Head
-  g.circle(-4, -52, 8).fill(SIL);
-
-  // BAT (wrapped around behind left shoulder)
-  g.moveTo(-8, -50).lineTo(-6, -58)
-    .stroke({ width: 3, color: BAT_WOOD, cap: 'round' });
-  g.moveTo(-6, -58).lineTo(-2, -68)
-    .stroke({ width: 4.5, color: BAT_WOOD, cap: 'round' });
-
-  return { x: -4, y: -52 };
-}
-
 // ============================================================
 // Ball
 // ============================================================
 
 function createBall() {
   ballSprite = new PIXI.Graphics();
-  ballSprite.circle(0, 0, 5).fill(0xffffff);
-  ballSprite.circle(0, 0, 5).stroke({ width: 1, color: 0xcc0000 });
+  // Pixel-art style ball: 3×3 pixel grid
+  const bs = PX;
+  ballSprite.rect(-bs, -bs, bs * 3, bs * 3).fill(0xffffff);
+  ballSprite.rect(0, -bs, bs, bs).fill(0xcc0000);   // top red stitch
+  ballSprite.rect(-bs, 0, bs, bs).fill(0xcc0000);   // left red stitch
+  ballSprite.rect(bs, 0, bs, bs).fill(0xcc0000);    // right red stitch
+  ballSprite.rect(0, bs, bs, bs).fill(0xcc0000);    // bottom red stitch
   ballSprite.visible = false;
   spriteApp.stage.addChild(ballSprite);
 }
