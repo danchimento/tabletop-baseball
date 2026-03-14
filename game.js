@@ -343,20 +343,28 @@ async function openContactModal() {
   $('field-overlay').innerHTML = '';
   $('contact-outcome').textContent = '';
   $('contact-outcome').className = '';
-  // Clean up any leftover dice rows from previous contact
-  $('contact-wrapper').querySelectorAll('.contact-dice-row').forEach(r => r.remove());
 
-  // Make field tappable instead of using a button
+  // Reset the permanent dice row to show tap prompt
+  const diceRow = $('contact-dice-row');
+  diceRow.innerHTML = '';
+  diceRow.style.opacity = '1';
+  const tapPrompt = document.createElement('div');
+  tapPrompt.id = 'contact-tap-prompt';
+  tapPrompt.className = 'roll-placeholder';
+  tapPrompt.textContent = 'Tap to Roll';
+  diceRow.appendChild(tapPrompt);
+
+  // Make field tappable
   const fieldView = $('field-view');
-  const tapPrompt = $('contact-tap-prompt');
-  if (tapPrompt) tapPrompt.classList.remove('hidden');
 
   return new Promise(resolve => {
-    fieldView.onclick = () => {
-      fieldView.onclick = null;
-      if (tapPrompt) tapPrompt.classList.add('hidden');
+    const onClick = () => {
+      fieldView.removeEventListener('click', onClick);
+      diceRow.removeEventListener('click', onClick);
       rollContactDice().then(resolve);
     };
+    fieldView.addEventListener('click', onClick);
+    diceRow.addEventListener('click', onClick);
   });
 }
 
@@ -371,10 +379,10 @@ async function rollContactDice() {
   const isOutfield = sum >= 5 && sum <= 7 || sum >= 10;
   const isHomeRun = result.outcome === 'home_run';
 
-  // Create dice below the field (in contact-wrapper, not field-overlay)
-  const wrapper = $('contact-wrapper');
-  const diceRow = document.createElement('div');
-  diceRow.className = 'contact-dice-row';
+  // Replace tap prompt with dice in the permanent row
+  const diceRow = $('contact-dice-row');
+  diceRow.innerHTML = '';
+  diceRow.style.opacity = '1';
 
   const die1 = createDieElement('die-green');
   die1.classList.add('field-die');
@@ -383,8 +391,6 @@ async function rollContactDice() {
   const die2 = createDieElement('die-green');
   die2.classList.add('field-die');
   diceRow.appendChild(die2);
-
-  wrapper.appendChild(diceRow);
 
   // Spin
   await Promise.all([spinDie(die1, d1), spinDie(die2, d2)]);
@@ -396,7 +402,6 @@ async function rollContactDice() {
   diceRow.style.transition = 'opacity 0.3s';
   diceRow.style.opacity = '0';
   await delay(300);
-  diceRow.style.visibility = 'hidden';
 
   // Create baseball at home plate
   const ball = document.createElement('div');
