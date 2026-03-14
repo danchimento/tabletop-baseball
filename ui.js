@@ -217,9 +217,25 @@ function updateButton() {
   switch (state.phase) {
     case 'BATTER_READY':
       batterSide.classList.add('tappable');
-      if (tapPrompt) tapPrompt.classList.remove('hidden');
+      // Show tap prompt as placeholder dice
+      if (tapPrompt) {
+        tapPrompt.classList.remove('hidden');
+        // Add enough placeholders to match pitcher dice count
+        const existing = $('batter-dice').querySelectorAll('.roll-placeholder');
+        existing.forEach(el => { if (el !== tapPrompt) el.remove(); });
+        for (let i = 1; i < PITCHER_DICE_COUNT; i++) {
+          const extra = document.createElement('div');
+          extra.className = 'roll-placeholder extra-placeholder';
+          extra.style.width = '48px';
+          extra.style.height = '48px';
+          $('batter-dice').appendChild(extra);
+        }
+      }
       batterSide.onclick = () => {
         if (state.phase === 'BATTER_READY') {
+          // Remove placeholder elements before rolling
+          $('batter-dice').querySelectorAll('.roll-placeholder').forEach(el => el.classList.add('hidden'));
+          $('batter-dice').querySelectorAll('.extra-placeholder').forEach(el => el.remove());
           swingBat();
         }
       };
@@ -247,7 +263,14 @@ function renderSummary() {
 
 function clearBattlefield() {
   $('pitcher-dice').innerHTML = '';
-  $('batter-dice').innerHTML = '';
+  // Preserve the tap-prompt element inside batter-dice
+  const batterDice = $('batter-dice');
+  const tapPrompt = $('tap-prompt');
+  batterDice.innerHTML = '';
+  if (tapPrompt) {
+    tapPrompt.classList.add('hidden');
+    batterDice.appendChild(tapPrompt);
+  }
   const lane0 = $('lane-0');
   const lane1 = $('lane-1');
   if (lane0) lane0.innerHTML = '';
@@ -261,19 +284,23 @@ function clearBattlefield() {
 
 let pitchClockTimer = null;
 
+function formatClockTime(n) {
+  return n < 10 ? ' ' + n : '' + n;
+}
+
 function startPitchClock() {
   stopPitchClock();
   let secondsLeft = PITCH_CLOCK_SECONDS;
   const timeEl = $('pitch-clock-time');
   const display = $('pitch-clock-display');
 
-  timeEl.textContent = secondsLeft;
+  timeEl.textContent = formatClockTime(secondsLeft);
   timeEl.classList.remove('urgent');
   display.classList.remove('urgent');
 
   pitchClockTimer = setInterval(() => {
     secondsLeft--;
-    timeEl.textContent = secondsLeft;
+    timeEl.textContent = formatClockTime(secondsLeft);
 
     if (secondsLeft <= 3) {
       timeEl.classList.add('urgent');
