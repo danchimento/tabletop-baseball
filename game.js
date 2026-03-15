@@ -1,5 +1,5 @@
 // ============================================================
-// game.js — Game Engine (State, Pitch, Battle, Contact, Scoring)
+// game.js — Game Engine (State, Pitch, Battle, Power, Scoring)
 // ============================================================
 
 // ============================================================
@@ -12,7 +12,6 @@ function freshState() {
   return {
     outs: 0,
     score: 0,
-    runners: [false, false, false],
     currentBatterIndex: 0,
     count: { balls: 0, strikes: 0 },
     phase: 'PRE_PITCH',
@@ -120,7 +119,7 @@ async function runBattle() {
 
 async function animateBattlePair(index, pVal, bVal, winner) {
   const pDice = Array.from($('pitcher-dice').children);
-  const bDice = Array.from($('batter-dice').children);
+  const bDice = Array.from($('batter-dice').querySelectorAll('.die-face'));
   const pDie = pDice[index];
   const bDie = bDice[index];
   if (!pDie || !bDie) return;
@@ -223,7 +222,7 @@ async function runOutcome() {
   // Animate batter sprite reaction based on pitch result
   if (pitchResult === 'contact') {
     await animateBatterResolve(true);
-  } else if (pitchResult === 'strike' || pitchResult === 'foul') {
+  } else if (pitchResult === 'strike') {
     await animateSwingMiss();
   } else {
     await animateBallTaken();
@@ -241,7 +240,7 @@ async function flyDieToBar(laneIndex, color, value) {
   // Find winner die: first check side containers, then battle lanes
   let winnerDie = null;
   const pDice = Array.from($('pitcher-dice').children);
-  const bDice = Array.from($('batter-dice').children);
+  const bDice = Array.from($('batter-dice').querySelectorAll('.die-face'));
 
   if (color === 'red' && pDice[laneIndex]?.classList.contains('winner-die')) {
     winnerDie = pDice[laneIndex];
@@ -290,23 +289,18 @@ async function processPitchResult(result) {
     updateCount();
     showPitchResultLabel('Strike!', 'result-strike');
 
-    if (state.count.strikes >= 3) {
+    if (state.count.strikes >= MAX_STRIKES) {
       await delay(250);
       await resolveAtBatEnd('strikeout');
       return;
     }
-  } else if (result === 'foul') {
-    state.count.strikes = Math.min(state.count.strikes + 1, 2);
-    addLog('Foul Ball');
-    updateCount();
-    showPitchResultLabel('Foul Ball', 'result-foul');
   } else if (result === 'ball') {
     state.count.balls++;
     addLog('Ball');
     updateCount();
     showPitchResultLabel('Ball', 'result-ball');
 
-    if (state.count.balls >= 4) {
+    if (state.count.balls >= MAX_BALLS) {
       await delay(250);
       await resolveAtBatEnd('walk');
       return;
@@ -315,7 +309,7 @@ async function processPitchResult(result) {
     addLog('Contact!');
     showPitchResultLabel('Contact!', 'result-contact');
     await delay(300);
-    await openContactModal();
+    await runPowerPhase();
     return;
   }
 
@@ -330,151 +324,101 @@ async function processPitchResult(result) {
 }
 
 // ============================================================
-// Contact Modal
+// Power Phase (replaces contact modal)
 // ============================================================
 
-async function openContactModal() {
-  state.phase = 'CONTACT';
-  updateButton();
+async function runPowerPhase() {
+  state.phase = 'POWER';
 
-  const modal = $('contact-modal');
-  modal.classList.remove('hidden');
+  // Hide outcome bar and battlefield, show power bar and roll area
+  $('outcome-bar').classList.add('hidden');
+  $('battlefield').classList.add('hidden');
+  $('power-bar').classList.remove('hidden');
+  $('power-roll-area').classList.remove('hidden');
 
-  $('field-overlay').innerHTML = '';
-  $('contact-outcome').textContent = '';
-  $('contact-outcome').className = '';
+  // Reset power bar
+  $('power-fill').style.transition = 'none';
+  $('power-fill').style.width = '0%';
+  $('power-value').textContent = '0';
 
-  // Reset the permanent dice row to show tap prompt
-  const diceRow = $('contact-dice-row');
-  diceRow.innerHTML = '';
-  diceRow.style.opacity = '1';
-  const tapPrompt = document.createElement('div');
-  tapPrompt.id = 'contact-tap-prompt';
-  tapPrompt.className = 'roll-placeholder';
+  // Wait for tap
+  const rollArea = $('power-roll-area');
+  const tapPrompt = $('power-tap-prompt');
   tapPrompt.textContent = 'Tap to Roll';
-  diceRow.appendChild(tapPrompt);
+  tapPrompt.className = 'roll-placeholder';
 
-  // Make field tappable
-  const fieldView = $('field-view');
-
-  return new Promise(resolve => {
+  await new Promise(resolve => {
     const onClick = () => {
-      fieldView.removeEventListener('click', onClick);
-      diceRow.removeEventListener('click', onClick);
-      rollContactDice().then(resolve);
+      rollArea.removeEventListener('click', onClick);
+      resolve();
     };
-    fieldView.addEventListener('click', onClick);
-    diceRow.addEventListener('click', onClick);
+    rollArea.addEventListener('click', onClick);
   });
-}
 
-async function rollContactDice() {
-  const d1 = rollD6(), d2 = rollD6();
-  const sum = d1 + d2;
-  const result = CONTACT_MAP[sum];
-  const pos = FIELD_POSITIONS[sum];
-
-  const overlay = $('field-overlay');
-  const isOut = result.outcome === 'ground_out';
-  const isOutfield = sum >= 5 && sum <= 7 || sum >= 10;
-  const isHomeRun = result.outcome === 'home_run';
-
-  // Replace tap prompt with dice in the permanent row
-  const diceRow = $('contact-dice-row');
+  // Roll the power die
+  const diceRow = $('power-dice-row');
   diceRow.innerHTML = '';
-  diceRow.style.opacity = '1';
 
-  const die1 = createDieElement('die-green');
-  die1.classList.add('field-die');
-  diceRow.appendChild(die1);
+  const die = createDieElement('die-gold');
+  diceRow.appendChild(die);
 
-  const die2 = createDieElement('die-green');
-  die2.classList.add('field-die');
-  diceRow.appendChild(die2);
+  const roll = rollD6();
+  await spinDie(die, roll);
+  await delay(400);
 
-  // Spin
-  await Promise.all([spinDie(die1, d1), spinDie(die2, d2)]);
+  // Map roll to power
+  const power = POWER_MAP[roll];
 
-  // Show dice result briefly
-  await delay(600);
+  // Animate power bar
+  const fillPercent = (roll / 6) * 100;
+  $('power-fill').style.transition = 'width 0.6s ease-out';
+  $('power-fill').style.width = fillPercent + '%';
+  $('power-value').textContent = power;
 
-  // Fade out dice
-  diceRow.style.transition = 'opacity 0.3s';
-  diceRow.style.opacity = '0';
+  await delay(800);
+
+  // Show result
+  let resultText, logText;
+  if (power === 0) {
+    resultText = 'Weak Hit!';
+    logText = `Power roll: ${roll} — Weak hit (0 pts)`;
+  } else if (power === 1) {
+    resultText = '+1 Run!';
+    logText = `Power roll: ${roll} — Solid hit (+1)`;
+  } else {
+    resultText = '+3 Runs!';
+    logText = `Power roll: ${roll} — CRUSHED IT! (+3)`;
+  }
+
+  addLog(logText, true);
+  state.score += power;
+  updateScoreboard();
+
   await delay(300);
 
-  // Create baseball at home plate
-  const ball = document.createElement('div');
-  ball.className = 'baseball';
-  ball.style.left = '48%';
-  ball.style.top = '90%';
-  ball.style.transform = 'scale(1)';
-  overlay.appendChild(ball);
+  // Restore normal UI
+  $('power-bar').classList.add('hidden');
+  $('power-roll-area').classList.add('hidden');
+  $('outcome-bar').classList.remove('hidden');
+  $('battlefield').classList.remove('hidden');
 
-  await delay(50);
+  // Show result overlay
+  const batter = currentBatter();
+  addLog(`${batter.name}: ${resultText}`, true);
 
-  // Fly baseball to target position
-  if (isOutfield || isHomeRun) {
-    const midX = (48 + pos.x) / 2;
-    const midY = (90 + pos.y) / 2 - 10;
-    ball.style.left = midX + '%';
-    ball.style.top = midY + '%';
-    ball.style.transition = 'left 0.6s ease-out, top 0.6s ease-out, transform 0.6s ease-out';
-    ball.style.transform = 'scale(2.5)';
-    await delay(600);
-
-    ball.style.transition = 'left 0.7s ease-in, top 0.7s ease-in, transform 0.7s ease-in';
-    ball.style.left = pos.x + '%';
-    ball.style.top = pos.y + '%';
-    ball.style.transform = 'scale(0.8)';
-    await delay(700);
+  if (power === 0) {
+    await showResultOverlay('Weak Hit', 'result-out');
   } else {
-    ball.style.transition = 'left 0.8s ease-out, top 0.8s ease-out, transform 0.8s ease-out';
-    ball.style.left = pos.x + '%';
-    ball.style.top = pos.y + '%';
-    ball.style.transform = 'scale(0.9)';
-    await delay(800);
+    await showResultOverlay(resultText, 'result-power');
   }
 
-  // If out, replace with X
-  if (isOut) {
-    ball.remove();
-    const marker = document.createElement('div');
-    marker.className = 'catch-marker';
-    marker.textContent = 'X';
-    marker.style.left = pos.x + '%';
-    marker.style.top = pos.y + '%';
-    overlay.appendChild(marker);
-  }
-
-  await delay(200);
-
-  // Show outcome text briefly in modal
-  const outcomeEl = $('contact-outcome');
-  outcomeEl.textContent = result.label;
-  if (result.outcome === 'home_run') {
-    outcomeEl.className = 'show outcome-hr result-pop';
-  } else if (result.outcome === 'ground_out') {
-    outcomeEl.className = 'show outcome-out result-pop';
-  } else {
-    outcomeEl.className = 'show outcome-hit result-pop';
-  }
-
-  addLog(`Contact: ${d1}+${d2}=${sum} — ${result.label}`);
-  await delay(600);
-
-  // Close modal
-  $('contact-modal').classList.add('hidden');
-  overlay.innerHTML = '';
-  outcomeEl.textContent = '';
-  outcomeEl.className = '';
-
-  // Show unified result overlay on game board
-  await resolveAtBatEnd(result.outcome);
+  // Move to next batter
+  await delay(300);
+  nextBatter();
 }
 
 // ============================================================
-// Base Running & Scoring
+// Scoring & At-Bat End
 // ============================================================
 
 async function resolveAtBatEnd(outcome) {
@@ -486,39 +430,13 @@ async function resolveAtBatEnd(outcome) {
       state.outs++;
       addLog(`${batter.name} strikes out.`, true);
       break;
-    case 'ground_out':
-      state.outs++;
-      addLog(`${batter.name} grounds out.`, true);
-      break;
     case 'walk':
-      advanceRunners(1, false);
-      state.runners[0] = true;
-      addLog(`${batter.name} walks.`, true);
+      state.score += 1;
+      addLog(`${batter.name} walks. +1 run!`, true);
       break;
-    case 'single':
-      advanceRunners(1, true);
-      state.runners[0] = true;
-      addLog(`${batter.name} singles!`, true);
-      break;
-    case 'double':
-      advanceRunners(2, true);
-      state.runners[1] = true;
-      addLog(`${batter.name} doubles!`, true);
-      break;
-    case 'home_run': {
-      let runs = 1;
-      for (let i = 0; i < 3; i++) {
-        if (state.runners[i]) runs++;
-      }
-      state.score += runs;
-      state.runners = [false, false, false];
-      addLog(`${batter.name} hits a HOME RUN! ${runs} run${runs > 1 ? 's' : ''} score!`, true);
-      break;
-    }
   }
 
   updateScoreboard();
-  updateDiamond();
 
   // Show unified result overlay
   await showResultOverlay(getResultText(outcome), getResultClass(outcome));
@@ -535,42 +453,6 @@ async function resolveAtBatEnd(outcome) {
   // Auto-advance to next batter after a brief pause
   await delay(300);
   nextBatter();
-}
-
-function advanceRunners(bases, batterOnBase) {
-  const newRunners = [false, false, false];
-
-  for (let i = 2; i >= 0; i--) {
-    if (state.runners[i]) {
-      const newPos = i + bases;
-      if (newPos >= 3) {
-        state.score++;
-      } else {
-        newRunners[newPos] = true;
-      }
-    }
-  }
-
-  if (!batterOnBase) {
-    const occupied = [state.runners[0], state.runners[1], state.runners[2]];
-    const result = [false, false, false];
-    let pushing = true;
-    for (let i = 0; i < 3; i++) {
-      if (pushing && occupied[i]) {
-        if (i + 1 >= 3) {
-          state.score++;
-        } else {
-          result[i + 1] = true;
-        }
-      } else {
-        pushing = false;
-        result[i] = occupied[i];
-      }
-    }
-    state.runners = result;
-  } else {
-    state.runners = newRunners;
-  }
 }
 
 function nextBatter() {
@@ -606,7 +488,6 @@ function startAtBat() {
   updateBatterName();
   updateCount();
   updateScoreboard();
-  updateDiamond();
   updateButton();
   resetSpriteScene();
 
