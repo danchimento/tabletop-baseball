@@ -29,16 +29,13 @@ function updateObValue() {
 function updateOutcomeBarZones() {
   // Convert threshold values to percentages on the bar
   const toP = v => valueToPercent(v);
-  const strikeEnd = toP(THRESHOLDS.foulMin);
-  const foulEnd = toP(THRESHOLDS.ball);
+  const strikeEnd = toP(THRESHOLDS.ball);
   const ballEnd = toP(THRESHOLDS.hit);
 
   $('ob-track').style.background = `linear-gradient(to right,
     rgba(233,69,96,0.35) 0%,
     rgba(233,69,96,0.2) ${strikeEnd}%,
-    rgba(192,160,64,0.2) ${strikeEnd}%,
-    rgba(192,160,64,0.15) ${foulEnd}%,
-    rgba(76,175,80,0.2) ${foulEnd}%,
+    rgba(76,175,80,0.2) ${strikeEnd}%,
     rgba(76,175,80,0.2) ${ballEnd}%,
     rgba(240,192,64,0.25) ${ballEnd}%,
     rgba(240,192,64,0.3) 100%
@@ -47,21 +44,19 @@ function updateOutcomeBarZones() {
   // Position labels at the center of each zone
   const labels = $('ob-labels');
   const strikeLabel = labels.querySelector('.ob-label-strike');
-  const foulLabel = labels.querySelector('.ob-label-foul');
   const ballLabel = labels.querySelector('.ob-label-ball');
   const hitLabel = labels.querySelector('.ob-label-hit');
 
   labels.style.position = 'relative';
   labels.style.display = 'block';
 
-  [strikeLabel, foulLabel, ballLabel, hitLabel].forEach(l => {
+  [strikeLabel, ballLabel, hitLabel].forEach(l => {
     l.style.position = 'absolute';
     l.style.transform = 'translateX(-50%)';
   });
 
   strikeLabel.style.left = (strikeEnd / 2) + '%';
-  foulLabel.style.left = ((strikeEnd + foulEnd) / 2) + '%';
-  ballLabel.style.left = ((foulEnd + ballEnd) / 2) + '%';
+  ballLabel.style.left = ((strikeEnd + ballEnd) / 2) + '%';
   hitLabel.style.left = ((ballEnd + 100) / 2) + '%';
 }
 
@@ -101,7 +96,6 @@ async function shakeIndicator() {
 function determineOutcome(value) {
   if (value >= THRESHOLDS.hit) return 'contact';
   if (value >= THRESHOLDS.ball) return 'ball';
-  if (value >= THRESHOLDS.foulMin) return 'foul';
   return 'strike';
 }
 
@@ -127,11 +121,7 @@ function showPitchResultLabel(text, cssClass) {
 function getResultText(outcome) {
   const map = {
     strikeout: 'Strikeout!',
-    walk: 'Walk',
-    ground_out: 'Out!',
-    single: 'Single!',
-    double: 'Double!',
-    home_run: 'HOME RUN!'
+    walk: 'Walk!',
   };
   return map[outcome] || outcome;
 }
@@ -140,10 +130,6 @@ function getResultClass(outcome) {
   const map = {
     strikeout: 'result-k',
     walk: 'result-walk',
-    ground_out: 'result-out',
-    single: 'result-hit',
-    double: 'result-hit',
-    home_run: 'result-hr'
   };
   return map[outcome] || '';
 }
@@ -157,6 +143,35 @@ async function showResultOverlay(text, cssClass, durationMs) {
   overlay.classList.remove('hidden');
   await delay(durationMs);
   overlay.classList.add('hidden');
+}
+
+// ============================================================
+// Count Health Bars
+// ============================================================
+
+function updateCount() {
+  // Update strike pips
+  for (let i = 0; i < MAX_STRIKES; i++) {
+    const pip = $(`strike-${i}`);
+    if (pip) {
+      if (i < state.count.strikes) {
+        pip.classList.add('filled');
+      } else {
+        pip.classList.remove('filled');
+      }
+    }
+  }
+  // Update ball pips
+  for (let i = 0; i < MAX_BALLS; i++) {
+    const pip = $(`ball-${i}`);
+    if (pip) {
+      if (i < state.count.balls) {
+        pip.classList.add('filled');
+      } else {
+        pip.classList.remove('filled');
+      }
+    }
+  }
 }
 
 // ============================================================
@@ -174,27 +189,6 @@ function updateScoreboard() {
 
   const inningEl = $('tv-inning');
   if (inningEl) inningEl.textContent = 'Top 1';
-}
-
-function updateDiamond() {
-  for (let i = 0; i < 3; i++) {
-    const base = $(`tv-base-${i + 1}`);
-    if (base) {
-      if (state.runners[i]) {
-        base.classList.add('runner-on');
-      } else {
-        base.classList.remove('runner-on');
-      }
-    }
-  }
-}
-
-function updateCount() {
-  const ballsEl = $('tv-balls');
-  if (ballsEl) ballsEl.textContent = `B: ${state.count.balls}`;
-
-  const strikesEl = $('tv-strikes');
-  if (strikesEl) strikesEl.textContent = `S: ${state.count.strikes}`;
 }
 
 function updateBatterName() {
@@ -372,9 +366,9 @@ function setupDebugControls() {
     $('debug-panel').classList.add('hidden');
   });
 
-  // Test hit button
+  // Test hit button — trigger power phase directly
   $('test-hit-btn').addEventListener('click', () => {
-    openContactModal();
+    runPowerPhase();
   });
 
   // Pitcher dice slider
@@ -404,22 +398,6 @@ function setupDebugControls() {
   hitSlider.addEventListener('input', () => {
     THRESHOLDS.hit = parseInt(hitSlider.value);
     $('hit-thresh-val').textContent = hitSlider.value;
-    updateOutcomeBarZones();
-  });
-
-  // Foul min
-  const foulSlider = $('foul-min');
-  foulSlider.addEventListener('input', () => {
-    THRESHOLDS.foulMin = parseInt(foulSlider.value);
-    $('foul-min-val').textContent = foulSlider.value;
-    updateOutcomeBarZones();
-  });
-
-  // Strike threshold
-  const strikeSlider = $('strike-thresh');
-  strikeSlider.addEventListener('input', () => {
-    THRESHOLDS.strike = parseInt(strikeSlider.value);
-    $('strike-thresh-val').textContent = strikeSlider.value;
     updateOutcomeBarZones();
   });
 }

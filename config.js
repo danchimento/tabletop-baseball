@@ -14,12 +14,12 @@ let PITCHER_DICE_COUNT = 2;
 let BATTER_DICE_COUNT = 2;
 
 // Outcome bar thresholds (value-based, 0 in center)
-// Positive = batter side, negative = pitcher side
+// Zones: Strike (left) | Ball (middle) | Contact (far right)
+// No fouls in this version
 let THRESHOLDS = {
-  hit: 7,       // >= this is a hit
-  ball: 3,      // >= this and < hit is ball
-  foulMin: -3,  // >= this and < ball is foul
-  strike: -3,   // < foulMin is strike (i.e. <= strike threshold)
+  hit: 7,       // >= this is contact
+  ball: 0,      // >= this and < hit is ball
+  strike: 0,    // < ball is strike
 };
 
 const DIE_DOTS = {
@@ -31,33 +31,18 @@ const DIE_DOTS = {
   6: [1,0,1, 1,0,1, 1,0,1],
 };
 
-const CONTACT_MAP = {
-  2:  { outcome: 'ground_out', label: 'Ground Out' },
-  3:  { outcome: 'ground_out', label: 'Ground Out' },
-  4:  { outcome: 'ground_out', label: 'Ground Out' },
-  5:  { outcome: 'ground_out', label: 'Fly Out' },
-  6:  { outcome: 'ground_out', label: 'Fly Out' },
-  7:  { outcome: 'ground_out', label: 'Fly Out' },
-  8:  { outcome: 'single',     label: 'Single!' },
-  9:  { outcome: 'single',     label: 'Single!' },
-  10: { outcome: 'double',     label: 'Double!' },
-  11: { outcome: 'double',     label: 'Double!' },
-  12: { outcome: 'home_run',   label: 'HOME RUN!' },
+// Power roll mapping: die value -> points scored
+const POWER_MAP = {
+  1: 0,
+  2: 0,
+  3: 1,
+  4: 1,
+  5: 3,
+  6: 3,
 };
 
-const FIELD_POSITIONS = {
-  2:  { x: 43.3, y: 82.1 },
-  3:  { x: 50.0, y: 77.9 },
-  4:  { x: 56.7, y: 82.1 },
-  5:  { x: 28.3, y: 63.6 },
-  6:  { x: 50.0, y: 55.4 },
-  7:  { x: 71.7, y: 63.6 },
-  8:  { x: 37.7, y: 70.0 },
-  9:  { x: 62.3, y: 70.0 },
-  10: { x: 21.7, y: 53.6 },
-  11: { x: 78.3, y: 53.6 },
-  12: { x: 50.0, y: 33.9 },
-};
+const MAX_BALLS = 3;
+const MAX_STRIKES = 3;
 
 // ~50% faster spin
 const SPIN_INTERVALS = [25,25,25,30,30,35,40,45,55,70,90,120,160];
