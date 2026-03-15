@@ -341,11 +341,10 @@ async function runPowerPhase() {
   $('power-fill').style.width = '0%';
   $('power-value').textContent = '0';
 
-  // Wait for tap
+  // Reset dice row with fresh tap prompt
   const rollArea = $('power-roll-area');
-  const tapPrompt = $('power-tap-prompt');
-  tapPrompt.textContent = 'Tap to Roll';
-  tapPrompt.className = 'roll-placeholder';
+  const diceRow = $('power-dice-row');
+  diceRow.innerHTML = '<div id="power-tap-prompt" class="roll-placeholder">Tap to Roll</div>';
 
   await new Promise(resolve => {
     const onClick = () => {
@@ -356,7 +355,6 @@ async function runPowerPhase() {
   });
 
   // Roll the power die
-  const diceRow = $('power-dice-row');
   diceRow.innerHTML = '';
 
   const die = createDieElement('die-gold');

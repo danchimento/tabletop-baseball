@@ -150,22 +150,24 @@ async function showResultOverlay(text, cssClass, durationMs) {
 // ============================================================
 
 function updateCount() {
-  // Update strike pips
+  // Health bars: start full, drain as count increases
+  const strikesRemaining = MAX_STRIKES - state.count.strikes;
   for (let i = 0; i < MAX_STRIKES; i++) {
     const pip = $(`strike-${i}`);
     if (pip) {
-      if (i < state.count.strikes) {
+      // Fill from left; remove from right as strikes accumulate
+      if (i < strikesRemaining) {
         pip.classList.add('filled');
       } else {
         pip.classList.remove('filled');
       }
     }
   }
-  // Update ball pips
+  const ballsRemaining = MAX_BALLS - state.count.balls;
   for (let i = 0; i < MAX_BALLS; i++) {
     const pip = $(`ball-${i}`);
     if (pip) {
-      if (i < state.count.balls) {
+      if (i < ballsRemaining) {
         pip.classList.add('filled');
       } else {
         pip.classList.remove('filled');
