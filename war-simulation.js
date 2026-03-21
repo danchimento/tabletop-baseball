@@ -59,15 +59,21 @@ const RARITY_WEIGHTS = {
 };
 
 const UPGRADE_CATALOG = [
-  { id: 'plus1',           name: '+1 Value',        rarity: 'common', type: 'bonus',  value: 1 },
-  { id: 'plus2',           name: '+2 Value',        rarity: 'rare',   type: 'bonus',  value: 2 },
-  { id: 'plus3',           name: '+3 Value',        rarity: 'epic',   type: 'bonus',  value: 3 },
-  { id: 'shuffleSelf',     name: 'Shuffle Deck',    rarity: 'common', type: 'action' },
-  { id: 'shuffleOpponent', name: 'Shuffle Enemy',   rarity: 'common', type: 'action' },
-  { id: 'stealCard',       name: 'Steal Card',      rarity: 'rare',   type: 'action' },
-  { id: 'bestToTop',       name: 'Best to Top',     rarity: 'rare',   type: 'action' },
-  { id: 'reduceReq',       name: 'Faster Upgrades', rarity: 'epic',   type: 'meta' },
-  { id: 'extraOption',     name: 'Extra Option',    rarity: 'epic',   type: 'meta' },
+  // Common: temporary bonuses, shuffles, rank boosts
+  { id: 'temp1',           name: '+1 Next Round',    rarity: 'common', type: 'temp',   value: 1 },
+  { id: 'temp2',           name: '+2 Next Round',    rarity: 'common', type: 'temp',   value: 2 },
+  { id: 'temp3',           name: '+3 Next Round',    rarity: 'common', type: 'temp',   value: 3 },
+  { id: 'shuffleSelf',     name: 'Shuffle Deck',     rarity: 'common', type: 'action' },
+  { id: 'shuffleOpponent', name: 'Shuffle Enemy',    rarity: 'common', type: 'action' },
+  { id: 'rankBoost',       name: 'Rank Boost',       rarity: 'common', type: 'rankBoost' },
+  // Rare: steal, best-to-top, double play
+  { id: 'stealCard',       name: 'Steal Card',       rarity: 'rare',   type: 'action' },
+  { id: 'bestToTop',       name: 'Best to Top',      rarity: 'rare',   type: 'action' },
+  { id: 'doublePlay',      name: 'Double Play',      rarity: 'rare',   type: 'doublePlay' },
+  // Epic: permanent +1, faster upgrades, extra option
+  { id: 'plus1perm',       name: '+1 Permanent',     rarity: 'epic',   type: 'bonus',  value: 1 },
+  { id: 'reduceReq',       name: 'Faster Upgrades',  rarity: 'epic',   type: 'meta' },
+  { id: 'extraOption',     name: 'Extra Option',     rarity: 'epic',   type: 'meta' },
 ];
 
 // Roll a random upgrade based on rarity weights
@@ -110,17 +116,28 @@ function defaultUpgradeStrategy(options, _state) {
     const optRank = RARITY_RANK[opt.rarity];
     if (optRank > bestRank) return opt;
     if (optRank === bestRank && opt.type === 'bonus' && best.type === 'bonus' && opt.value > best.value) return opt;
+    if (optRank === bestRank && opt.type === 'temp' && best.type === 'temp' && opt.value > best.value) return opt;
     return best;
   });
 }
 
-// Apply a chosen upgrade to the game state, returns description of what happened
+// Compute the effective value of a card given the player's state
+function cardValue(baseRank, state) {
+  const rankBonus = state.rankBonuses[baseRank] || 0;
+  const tempBonus = state.tempBonus || 0;
+  return baseRank + state.p1Bonus + rankBonus + tempBonus;
+}
+
+// Apply a chosen upgrade to the game state
 function applyUpgrade(upgrade, state) {
   switch (upgrade.id) {
-    case 'plus1':
-    case 'plus2':
-    case 'plus3':
-      state.p1Bonus += upgrade.value;
+    case 'plus1perm':
+      state.p1Bonus += 1;
+      break;
+    case 'temp1':
+    case 'temp2':
+    case 'temp3':
+      state.tempBonus += upgrade.value;
       break;
     case 'shuffleSelf':
       shuffle(state.p1);
@@ -146,6 +163,19 @@ function applyUpgrade(upgrade, state) {
       }
       break;
     }
+    case 'rankBoost': {
+      // Pick a random rank (2-14) and permanently boost it by 1
+      const rank = state.rankBoostTarget != null
+        ? state.rankBoostTarget  // allow tests to override
+        : Math.floor(Math.random() * 13) + 2;
+      state.rankBonuses[rank] = (state.rankBonuses[rank] || 0) + 1;
+      // Store for result tracking
+      upgrade = { ...upgrade, boostedRank: rank };
+      break;
+    }
+    case 'doublePlay':
+      state.doublePlayNext = true;
+      break;
     case 'reduceReq':
       state.winsRequired = Math.max(1, state.winsRequired - 1);
       break;
@@ -153,6 +183,7 @@ function applyUpgrade(upgrade, state) {
       state.upgradeOptionCount++;
       break;
   }
+  return upgrade;
 }
 
 function playWarGame(options = {}) {
@@ -163,7 +194,7 @@ function playWarGame(options = {}) {
     maxTurns = 50000,
     upgrade = null, // Legacy: { trigger: fn, effect: fn }
     // New upgrade card system
-    upgradeCards = null, // { winsRequired, optionCount, strategy } or true for defaults
+    upgradeCards = null, // { winsRequired, optionCount, strategy, upgradeRoller } or true for defaults
   } = options;
 
   let p1, p2;
@@ -193,15 +224,85 @@ function playWarGame(options = {}) {
     p1: p1,
     p2: p2,
     p1Bonus: 0,
+    rankBonuses: {},      // { rank: bonus } e.g. { 5: 1, 9: 2 }
+    tempBonus: 0,         // bonus that applies to next round only, then resets
+    doublePlayNext: false, // if true, next turn is a double-play turn
     winsRequired: (ucConfig.winsRequired != null) ? ucConfig.winsRequired : 5,
     upgradeOptionCount: (ucConfig.optionCount != null) ? ucConfig.optionCount : 2,
     winsSinceLastUpgrade: 0,
     upgradesChosen: [],
   };
   const ucStrategy = ucConfig.strategy || defaultUpgradeStrategy;
+  const ucRoller = ucConfig.upgradeRoller || rollUpgradeOptions;
+
+  // Helper: compute p1's effective card value using all bonuses
+  function p1CardValue(baseRank) {
+    if (!useUpgradeCards) return baseRank;
+    return baseRank + ucState.p1Bonus + (ucState.rankBonuses[baseRank] || 0) + ucState.tempBonus;
+  }
 
   while (p1.length > 0 && p2.length > 0 && turns < maxTurns) {
     turns++;
+
+    // ── DOUBLE PLAY TURN ──
+    // Player plays 2 cards, opponent plays 1. Opponent must beat BOTH to win.
+    if (useUpgradeCards && ucState.doublePlayNext) {
+      ucState.doublePlayNext = false;
+      if (p1.length >= 2) {
+        const p1a_raw = p1.shift();
+        const p1b_raw = p1.shift();
+        const p2c_raw = p2.shift();
+        const p1a = p1CardValue(p1a_raw);
+        const p1b = p1CardValue(p1b_raw);
+        const p2c = p2c_raw; // opponent gets no bonuses
+
+        let turnWinner;
+        if (p2c > p1a && p2c > p1b) {
+          // Opponent beats both — opponent takes all 3
+          p2.push(p2c_raw, p1a_raw, p1b_raw);
+          p2HandWins++;
+          p2Streak++; p1Streak = 0;
+          turnWinner = 2;
+        } else {
+          // Player wins (at least one card wasn't beaten)
+          p1.push(p1a_raw, p1b_raw, p2c_raw);
+          p1HandWins++;
+          p1Streak++; p2Streak = 0;
+          turnWinner = 1;
+        }
+
+        // Clear temp bonus after double-play turn
+        ucState.tempBonus = 0;
+
+        // Check upgrade trigger
+        if (turnWinner === 1) {
+          ucState.winsSinceLastUpgrade++;
+          if (ucState.winsSinceLastUpgrade >= ucState.winsRequired) {
+            ucState.winsSinceLastUpgrade = 0;
+            const opts = ucRoller(ucState.upgradeOptionCount);
+            if (opts.length > 0) {
+              const chosen = ucStrategy(opts, ucState);
+              const applied = applyUpgrade(chosen, ucState);
+              ucState.upgradesChosen.push(applied);
+              p1TotalUpgrades++;
+            }
+          }
+        }
+
+        if (p1Streak > p1MaxStreak) p1MaxStreak = p1Streak;
+        if (p2Streak > p2MaxStreak) p2MaxStreak = p2Streak;
+        const diff = p1.length - p2.length;
+        if (diff > p1MaxLead) p1MaxLead = diff;
+        if (-diff > p2MaxLead) p2MaxLead = -diff;
+        const currentLeader = diff > 0 ? 1 : diff < 0 ? 2 : 0;
+        if (currentLeader !== 0 && lastLeader !== 0 && currentLeader !== lastLeader) leadChanges++;
+        if (currentLeader !== 0) lastLeader = currentLeader;
+        continue;
+      }
+      // If p1 doesn't have 2 cards, fall through to normal turn
+    }
+
+    // ── NORMAL TURN ──
     const p1Cards = [];
     const p2Cards = [];
 
@@ -211,16 +312,21 @@ function playWarGame(options = {}) {
     p2Cards.push(c2raw);
 
     // Apply upgrade bonus to face-up comparison cards only
-    let p1Bonus, p2Bonus;
+    let c1, c2;
     if (useUpgradeCards) {
-      p1Bonus = ucState.p1Bonus;
-      p2Bonus = 0;
+      c1 = p1CardValue(c1raw);
+      c2 = c2raw;
     } else {
-      p1Bonus = upgrade ? upgrade.effect(p1UpgradeLevel) : 0;
-      p2Bonus = upgrade ? upgrade.effect(p2UpgradeLevel) : 0;
+      const p1Bonus = upgrade ? upgrade.effect(p1UpgradeLevel) : 0;
+      const p2Bonus = upgrade ? upgrade.effect(p2UpgradeLevel) : 0;
+      c1 = c1raw + p1Bonus;
+      c2 = c2raw + p2Bonus;
     }
-    let c1 = c1raw + p1Bonus;
-    let c2 = c2raw + p2Bonus;
+
+    // Clear temp bonus after it's been applied this turn
+    if (useUpgradeCards) {
+      ucState.tempBonus = 0;
+    }
 
     let consecutiveWars = 0;
 
@@ -248,8 +354,16 @@ function playWarGame(options = {}) {
       c2raw = p2.shift();
       p1Cards.push(c1raw);
       p2Cards.push(c2raw);
-      c1 = c1raw + p1Bonus;
-      c2 = c2raw + p2Bonus;
+      if (useUpgradeCards) {
+        // temp bonus already cleared; rank+permanent bonuses still apply in war
+        c1 = c1raw + ucState.p1Bonus + (ucState.rankBonuses[c1raw] || 0);
+        c2 = c2raw;
+      } else {
+        const p1Bonus = upgrade ? upgrade.effect(p1UpgradeLevel) : 0;
+        const p2Bonus = upgrade ? upgrade.effect(p2UpgradeLevel) : 0;
+        c1 = c1raw + p1Bonus;
+        c2 = c2raw + p2Bonus;
+      }
     }
 
     if (warEndedGame) break;
@@ -288,11 +402,11 @@ function playWarGame(options = {}) {
       ucState.winsSinceLastUpgrade++;
       if (ucState.winsSinceLastUpgrade >= ucState.winsRequired) {
         ucState.winsSinceLastUpgrade = 0;
-        const options = rollUpgradeOptions(ucState.upgradeOptionCount);
-        if (options.length > 0) {
-          const chosen = ucStrategy(options, ucState);
-          applyUpgrade(chosen, ucState);
-          ucState.upgradesChosen.push(chosen);
+        const opts = ucRoller(ucState.upgradeOptionCount);
+        if (opts.length > 0) {
+          const chosen = ucStrategy(opts, ucState);
+          const applied = applyUpgrade(chosen, ucState);
+          ucState.upgradesChosen.push(applied);
           p1TotalUpgrades++;
         }
       }
@@ -337,6 +451,7 @@ function playWarGame(options = {}) {
       upgradesChosen: ucState.upgradesChosen,
       finalWinsRequired: ucState.winsRequired,
       finalOptionCount: ucState.upgradeOptionCount,
+      rankBonuses: { ...ucState.rankBonuses },
     } : {}),
   };
 }
@@ -358,9 +473,9 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     createDeck, shuffle, playWarGame, percentile, stddev,
     upgradeEffects, upgradeTriggers,
-    UPGRADE_CATALOG, RARITY_WEIGHTS,
+    UPGRADE_CATALOG, RARITY_WEIGHTS, RARITY_RANK,
     rollUpgrade, rollUpgradeOptions,
-    defaultUpgradeStrategy, applyUpgrade,
+    defaultUpgradeStrategy, applyUpgrade, cardValue,
   };
 }
 

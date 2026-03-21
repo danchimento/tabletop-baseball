@@ -1,4 +1,4 @@
-const { createDeck, shuffle, playWarGame, percentile, stddev, upgradeEffects, upgradeTriggers } = require('./war-simulation');
+const { createDeck, shuffle, playWarGame, percentile, stddev, upgradeEffects, upgradeTriggers, UPGRADE_CATALOG, applyUpgrade, cardValue } = require('./war-simulation');
 
 let passed = 0;
 let failed = 0;
