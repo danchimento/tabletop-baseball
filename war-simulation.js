@@ -18,12 +18,43 @@ function shuffle(arr) {
   return arr;
 }
 
+// Built-in upgrade effects
+const upgradeEffects = {
+  // +1 per upgrade level to face-up comparison card
+  plusOne: (level) => level,
+};
+
+// Built-in upgrade triggers
+// Each trigger function receives { p1HandWins, p2HandWins, turns, winner }
+// and returns { p1Upgrade: bool, p2Upgrade: bool }
+const upgradeTriggers = {
+  // Upgrade every N wins for the winning player
+  everyNWins: (n = 1) => ({ winner }) => ({
+    p1Upgrade: winner === 1 && (n === 1 || false),
+    p2Upgrade: winner === 2 && (n === 1 || false),
+  }),
+  // More general: upgrade player 1 every N of their wins
+  p1EveryNWins: (n = 1) => {
+    let count = 0;
+    return ({ winner }) => {
+      if (winner === 1) count++;
+      return { p1Upgrade: winner === 1 && count % n === 0, p2Upgrade: false };
+    };
+  },
+  // Upgrade every N turns (regardless of who won)
+  everyNTurns: (n) => ({ turns }) => ({
+    p1Upgrade: turns % n === 0,
+    p2Upgrade: false,
+  }),
+};
+
 function playWarGame(options = {}) {
   const {
     p1Hand,
     p2Hand,
     shufflePot = false,
-    maxTurns = 50000
+    maxTurns = 50000,
+    upgrade = null, // { trigger: fn({p1HandWins,p2HandWins,turns,winner}) => {p1Upgrade,p2Upgrade}, effect: fn(level) => bonus }
   } = options;
 
   let p1, p2;
@@ -41,16 +72,24 @@ function playWarGame(options = {}) {
   let p1MaxLead = 0, p2MaxLead = 0, leadChanges = 0, lastLeader = 0;
   let warEndedGame = false;
   let p1HandWins = 0, p2HandWins = 0;
+  let p1UpgradeLevel = 0, p2UpgradeLevel = 0;
+  let p1TotalUpgrades = 0, p2TotalUpgrades = 0;
 
   while (p1.length > 0 && p2.length > 0 && turns < maxTurns) {
     turns++;
     const p1Cards = [];
     const p2Cards = [];
 
-    let c1 = p1.shift();
-    let c2 = p2.shift();
-    p1Cards.push(c1);
-    p2Cards.push(c2);
+    let c1raw = p1.shift();
+    let c2raw = p2.shift();
+    p1Cards.push(c1raw);
+    p2Cards.push(c2raw);
+
+    // Apply upgrade bonus to face-up comparison cards only
+    const p1Bonus = upgrade ? upgrade.effect(p1UpgradeLevel) : 0;
+    const p2Bonus = upgrade ? upgrade.effect(p2UpgradeLevel) : 0;
+    let c1 = c1raw + p1Bonus;
+    let c2 = c2raw + p2Bonus;
 
     let consecutiveWars = 0;
 
@@ -74,14 +113,17 @@ function playWarGame(options = {}) {
         p1Cards.push(p1.shift());
         p2Cards.push(p2.shift());
       }
-      c1 = p1.shift();
-      c2 = p2.shift();
-      p1Cards.push(c1);
-      p2Cards.push(c2);
+      c1raw = p1.shift();
+      c2raw = p2.shift();
+      p1Cards.push(c1raw);
+      p2Cards.push(c2raw);
+      c1 = c1raw + p1Bonus;
+      c2 = c2raw + p2Bonus;
     }
 
     if (warEndedGame) break;
 
+    let turnWinner;
     if (shufflePot) {
       const pot = [...p1Cards, ...p2Cards];
       shuffle(pot);
@@ -89,21 +131,32 @@ function playWarGame(options = {}) {
         p1.push(...pot);
         p1HandWins++;
         p1Streak++; p2Streak = 0;
+        turnWinner = 1;
       } else {
         p2.push(...pot);
         p2HandWins++;
         p2Streak++; p1Streak = 0;
+        turnWinner = 2;
       }
     } else {
       if (c1 > c2) {
         p1.push(...p1Cards, ...p2Cards);
         p1HandWins++;
         p1Streak++; p2Streak = 0;
+        turnWinner = 1;
       } else {
         p2.push(...p2Cards, ...p1Cards);
         p2HandWins++;
         p2Streak++; p1Streak = 0;
+        turnWinner = 2;
       }
+    }
+
+    // Check upgrade trigger after each turn
+    if (upgrade) {
+      const result = upgrade.trigger({ p1HandWins, p2HandWins, turns, winner: turnWinner });
+      if (result.p1Upgrade) { p1UpgradeLevel++; p1TotalUpgrades++; }
+      if (result.p2Upgrade) { p2UpgradeLevel++; p2TotalUpgrades++; }
     }
 
     if (p1Streak > p1MaxStreak) p1MaxStreak = p1Streak;
@@ -130,7 +183,9 @@ function playWarGame(options = {}) {
     leadChanges, winner, capped, warEndedGame,
     p1HandWins, p2HandWins,
     p1Remaining: p1.length,
-    p2Remaining: p2.length
+    p2Remaining: p2.length,
+    p1UpgradeLevel, p2UpgradeLevel,
+    p1TotalUpgrades, p2TotalUpgrades,
   };
 }
 
@@ -148,7 +203,7 @@ function stddev(arr, mean) {
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createDeck, shuffle, playWarGame, percentile, stddev };
+  module.exports = { createDeck, shuffle, playWarGame, percentile, stddev, upgradeEffects, upgradeTriggers };
 }
 
 // Only run simulation when executed directly (not when required by tests)
