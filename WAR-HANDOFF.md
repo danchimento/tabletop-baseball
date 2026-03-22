@@ -141,21 +141,30 @@ The upgrade/power-up system adds strategic depth to War.
 - Player must pick one before the next round continues (game pauses)
 - After selection, the panel slides away and the upgrade becomes active
 
-**Example Upgrades (starter set — expand later):**
+**Upgrade Catalog** (matches `UPGRADE_CATALOG` in `war-simulation.js`):
 
-| Upgrade | Effect | Duration |
-|---------|--------|----------|
-| **+2 Boost** | Add +2 to your card's value | 3 rounds |
-| **-2 Sabotage** | Subtract 2 from opponent's card value | 3 rounds |
-| **Double Down** | Next war you win, take 2 extra cards from opponent | 1 war |
-| **Shield** | Next round you lose, keep your card instead of losing it | 1 use |
-| **Peek** | See opponent's next card before you play | 2 rounds |
-| **Ace Crusher** | Your card beats Aces regardless of value | 2 rounds |
-| **Rally** | If you're behind (fewer cards), +3 to your value | 3 rounds |
+Rarity weights: Common 60%, Rare 30%, Epic 10%.
 
-**Active upgrade display**: Small badges/icons shown in a strip above the XP bar. Each badge shows the upgrade icon and a countdown (rounds remaining). When an upgrade expires, it fades out.
+| Rarity | ID | Name | Type | Effect |
+|--------|----|------|------|--------|
+| Common | `temp1` | +1 Next Round | temp | Temporary +1 to your card's value for the next comparison |
+| Common | `temp2` | +2 Next Round | temp | Temporary +2 to your card's value for the next comparison |
+| Common | `temp3` | +3 Next Round | temp | Temporary +3 to your card's value for the next comparison |
+| Common | `shuffleSelf` | Shuffle Deck | action | Shuffle your own deck (randomize card order) |
+| Common | `shuffleOpponent` | Shuffle Enemy | action | Shuffle the opponent's deck |
+| Common | `rankBoost` | Rank Boost | rankBoost | Permanently +1 to all cards of a random rank (2–14) |
+| Rare | `stealCard` | Steal Card | action | Steal a random card from opponent's deck and add it to yours |
+| Rare | `bestToTop` | Best to Top | action | Move your highest-value card to the top of your deck |
+| Rare | `doublePlay` | Double Play | doublePlay | Next round you win, take double the cards |
+| Epic | `plus1perm` | +1 Permanent | bonus | Permanent +1 to all your card values for the rest of the game |
+| Epic | `reduceReq` | Faster Upgrades | meta | Reduce wins required to earn next upgrade by 1 |
+| Epic | `extraOption` | Extra Option | meta | Get one additional upgrade choice next time you earn an upgrade |
 
-**Evaluation with upgrades**: During the evaluation phase (step 4 of core loop), iterate through all active upgrades for both players, apply modifiers to the base card values, then compare the modified values. Show the modified value briefly on the card (e.g., "K → 15" if a +2 boost is active).
+**AI strategy**: Opponent picks upgrades by prioritizing highest rarity tier, then highest value within bonus/temp types. See `defaultUpgradeStrategy()` in `war-simulation.js`.
+
+**Active upgrade display**: Small badges/icons shown in a strip above the XP bar. Each badge shows the upgrade icon and its type. Temp bonuses show their +N value; permanent effects show a star/crown. When a temp bonus is consumed, the badge fades out.
+
+**Evaluation with upgrades**: During the evaluation phase, compute effective card value via `baseRank + permanentBonus + rankBonus[rank] + tempBonus`, then compare. Show the modified value briefly on the card (e.g., "K → 15" if a +2 temp bonus is active). Temp bonuses reset to 0 after each comparison.
 
 ---
 
